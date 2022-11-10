@@ -7,32 +7,50 @@ import (
 	"time"
 )
 
-const (
-	INTEGER ElementType = 'i'
-	LONG    ElementType = 'l'
-	FLOAT   ElementType = 'f'
-	DOUBLE  ElementType = 'd'
-	BOOLEAN ElementType = 'b'
-	STRING  ElementType = 's'
-	TIME    ElementType = 't'
-	ARRAY   ElementType = 'a'
-	MAP     ElementType = 'm'
-)
+//
+// const (
+// 	INTEGER ElementType = 'i'
+// 	LONG    ElementType = 'l'
+// 	FLOAT   ElementType = 'f'
+// 	DOUBLE  ElementType = 'd'
+// 	BOOLEAN ElementType = 'b'
+// 	STRING  ElementType = 's'
+// 	TIME    ElementType = 't'
+// 	ARRAY   ElementType = 'a'
+// 	MAP     ElementType = 'm'
+// )
+//
+// type Record []byte
+// type RecordOffset int16
+// type ElementType byte
+//
+// type Array struct {
+// 	ElementType ElementType
+// 	Values      []any
+// }
+//
+// type Map struct {
+// 	KeyType   ElementType
+// 	ValueType ElementType
+// 	data      map[any]any
+// }
 
-type Record []byte
-type RecordOffset int16
-type ElementType byte
+// -------------------------------------------------------------------------------------------------
+// QUESTION - how do you update a record? You can't just append to the end of the record, you need
+// to update the offsets of all the other records. So you need to be able to update the record in
+// place. This is a problem for the string, map and array types, because they have variable length.
+// -------------------------------------------------------------------------------------------------
 
-type Array struct {
-	ElementType ElementType
-	Values      []any
-}
-
-type Map struct {
-	KeyType   ElementType
-	ValueType ElementType
-	data      map[any]any
-}
+// -------------------------------------------------------------------------------------------------
+// Algorithm for storing null values:
+// 1. Use a function to set a null at a given offset (also takes in an element type):
+//    - This function will set the bit for the latest element in bitmap to 1.
+//    - This function however will also store a default value for the element at given byte offset,
+//      only if the element type is not a variable-length element like string, array, or map.
+// 2. Use a function to check if a value for a given column ID is null
+//    - This function will just check if the bit at the given column ID (number) is set to 1 in the
+//      bitmap.
+// -------------------------------------------------------------------------------------------------
 
 func ElementTypeOfValue(val any) (ElementType, error) {
 	var elementType ElementType
@@ -52,9 +70,9 @@ func ElementTypeOfValue(val any) (ElementType, error) {
 		elementType = STRING
 	case time.Time:
 		elementType = TIME
-	case []any:
+	case Array:
 		elementType = ARRAY
-	case map[any]any:
+	case Map:
 		elementType = MAP
 	default:
 		err = fmt.Errorf("unsupported type %T", val)
