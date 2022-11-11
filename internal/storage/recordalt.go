@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"time"
 )
@@ -31,6 +32,16 @@ type Map struct {
 	KeyType   ElementType
 	ValueType ElementType
 	data      map[any]any
+}
+
+type WriteOverflowError struct {
+	availableBytes uint16
+	requiredBytes  uint16
+	data           any
+}
+
+func (e *WriteOverflowError) Error() string {
+	return fmt.Sprintf("not enough space to write %v bytes for %v", e.requiredBytes, e.data)
 }
 
 func (r *Record) setLength(length uint16) {
@@ -157,4 +168,30 @@ func (r *Record) SetBool(position uint16, value bool) {
 // SetTime saves the given time value at the given element position in the record.
 func (r *Record) SetTime(position uint16, value time.Time) {
 	r.SetUint64(position, uint64(value.UnixNano()))
+}
+
+// SetString saves the given string value at the given element position in the record. If a string
+// value is already stored at the given element position and the incoming value is smaller or equal
+// to the length of the existing string, the existing string is overwritten with the new value. If
+// the incoming value is larger than the length of the existing string, a WriteOverflowError is
+// returned.
+func (r *Record) SetString(position uint16, value string) error {
+	offset := r.offset(position)
+	if offset == 0 {
+		offset = r.Length()
+		r.setLength(offset + 2 + uint16(len(value)))
+		r.setOffset(position, offset)
+		*r = append(*r, byte(len(value)), byte(len(value)>>8))
+		*r = append(*r, value...)
+	} else {
+		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+		requiredLength := uint16(len(value))
+		if currentLength < requiredLength {
+			return &WriteOverflowError{
+				currentLength, requiredLength, value,
+			}
+		}
+		copy((*r)[offset+2:offset+2+requiredLength], value)
+	}
+	return nil
 }

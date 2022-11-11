@@ -6,7 +6,7 @@ import (
 )
 
 func checkRecordLength(t *testing.T, r *Record, want int) {
-	got := len((*r))
+	got := len(*r)
 	if got != want {
 		t.Errorf("expected length %d, got %d", want, got)
 	}
@@ -396,6 +396,102 @@ func TestRecord_SetTime(t *testing.T) {
 			checkRecordLength(t, r, 14)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
 			checkRecordBytes(t, r, 6, []byte{0, 120, 231, 11, 253, 49, 33, 23})
+		},
+	)
+}
+
+func TestRecord_SetString(t *testing.T) {
+	t.Run(
+		"check empty string", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 8)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0})
+		},
+	)
+
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetString(1, "world")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 22)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 15, 0})
+			checkRecordBytes(t, r, 8, []byte{5, 0, 104, 101, 108, 108, 111})
+			checkRecordBytes(t, r, 15, []byte{5, 0, 119, 111, 114, 108, 100})
+		},
+	)
+
+	t.Run(
+		"check string with null character", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "hello\x00world")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 19)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(
+				t, r, 6, []byte{11, 0, 104, 101, 108, 108, 111, 0, 119, 111, 114, 108, 100},
+			)
+		},
+	)
+
+	t.Run(
+		"check emoji", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "😀")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 12)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{4, 0, 240, 159, 152, 128})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetString(0, "world")
+			if err != nil {
+				t.Error(err)
+			}
+			checkRecordLength(t, r, 13)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{5, 0, 119, 111, 114, 108, 100})
+		},
+	)
+
+	t.Run(
+		"check write overflows", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetString(0, "world!")
+			if err == nil {
+				t.Error("expected error when writing over a shorter string")
+			}
 		},
 	)
 }
