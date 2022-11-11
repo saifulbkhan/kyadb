@@ -73,8 +73,13 @@ func (r *Record) SetUint32(position uint16, value uint32) {
 		offset = r.Length()
 		r.setLength(offset + 4)
 		r.setOffset(position, offset)
+		*r = append(*r, byte(value), byte(value>>8), byte(value>>16), byte(value>>24))
+	} else {
+		(*r)[offset] = byte(value)
+		(*r)[offset+1] = byte(value >> 8)
+		(*r)[offset+2] = byte(value >> 16)
+		(*r)[offset+3] = byte(value >> 24)
 	}
-	*r = append(*r, byte(value), byte(value>>8), byte(value>>16), byte(value>>24))
 }
 
 // SetUint64 saves the given uint64 value at the given element position in the record.
@@ -84,18 +89,27 @@ func (r *Record) SetUint64(position uint16, value uint64) {
 		offset = r.Length()
 		r.setLength(offset + 8)
 		r.setOffset(position, offset)
+		*r = append(
+			*r,
+			byte(value),
+			byte(value>>8),
+			byte(value>>16),
+			byte(value>>24),
+			byte(value>>32),
+			byte(value>>40),
+			byte(value>>48),
+			byte(value>>56),
+		)
+	} else {
+		(*r)[offset] = byte(value)
+		(*r)[offset+1] = byte(value >> 8)
+		(*r)[offset+2] = byte(value >> 16)
+		(*r)[offset+3] = byte(value >> 24)
+		(*r)[offset+4] = byte(value >> 32)
+		(*r)[offset+5] = byte(value >> 40)
+		(*r)[offset+6] = byte(value >> 48)
+		(*r)[offset+7] = byte(value >> 56)
 	}
-	*r = append(
-		*r,
-		byte(value),
-		byte(value>>8),
-		byte(value>>16),
-		byte(value>>24),
-		byte(value>>32),
-		byte(value>>40),
-		byte(value>>48),
-		byte(value>>56),
-	)
 }
 
 // SetInt32 saves the given int32 value at the given element position in the record.

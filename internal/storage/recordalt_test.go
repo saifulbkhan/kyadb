@@ -85,6 +85,18 @@ func TestRecord_SetUint32(t *testing.T) {
 			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255})
 		},
 	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint32(0, 10)
+			r.SetUint32(0, 20)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{20, 0, 0, 0})
+		},
+	)
 }
 
 func TestRecord_SetUint64(t *testing.T) {
@@ -120,6 +132,18 @@ func TestRecord_SetUint64(t *testing.T) {
 			checkRecordLength(t, r, 14)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
 			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 255, 255})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint64(0, 10)
+			r.SetUint64(0, 20)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{20, 0, 0, 0, 0, 0, 0, 0})
 		},
 	)
 }
@@ -159,6 +183,18 @@ func TestRecord_SetInt32(t *testing.T) {
 			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 127})
 		},
 	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt32(0, 10)
+			r.SetInt32(0, -20)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{236, 255, 255, 255})
+		},
+	)
 }
 
 func TestRecord_SetInt64(t *testing.T) {
@@ -194,6 +230,18 @@ func TestRecord_SetInt64(t *testing.T) {
 			checkRecordLength(t, r, 14)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
 			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 255, 127})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt64(0, 10)
+			r.SetInt64(0, -20)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{236, 255, 255, 255, 255, 255, 255, 255})
 		},
 	)
 }
@@ -233,6 +281,18 @@ func TestRecord_SetFloat32(t *testing.T) {
 			checkRecordBytes(t, r, 6, []byte{255, 255, 127, 127})
 		},
 	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat32(0, 10.5)
+			r.SetFloat32(0, -20.5)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 164, 193})
+		},
+	)
 }
 
 func TestRecord_SetFloat64(t *testing.T) {
@@ -268,6 +328,18 @@ func TestRecord_SetFloat64(t *testing.T) {
 			checkRecordLength(t, r, 14)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
 			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 239, 127})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat64(0, 10.5)
+			r.SetFloat64(0, -20.5)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 0, 0, 128, 52, 192})
 		},
 	)
 }
