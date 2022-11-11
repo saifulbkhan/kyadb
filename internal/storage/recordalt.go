@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/binary"
 	"math"
+	"time"
 )
 
 const (
@@ -130,4 +131,30 @@ func (r *Record) SetFloat32(position uint16, value float32) {
 // SetFloat64 saves the given float64 value at the given element position in the record.
 func (r *Record) SetFloat64(position uint16, value float64) {
 	r.SetUint64(position, math.Float64bits(value))
+}
+
+// SetBool saves the given bool value at the given element position in the record.
+func (r *Record) SetBool(position uint16, value bool) {
+	offset := r.offset(position)
+	if offset == 0 {
+		offset = r.Length()
+		r.setLength(offset + 1)
+		r.setOffset(position, offset)
+		if value {
+			*r = append(*r, 1)
+		} else {
+			*r = append(*r, 0)
+		}
+	} else {
+		if value {
+			(*r)[offset] = 1
+		} else {
+			(*r)[offset] = 0
+		}
+	}
+}
+
+// SetTime saves the given time value at the given element position in the record.
+func (r *Record) SetTime(position uint16, value time.Time) {
+	r.SetUint64(position, uint64(value.UnixNano()))
 }

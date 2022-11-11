@@ -1,6 +1,9 @@
 package storage
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func checkRecordLength(t *testing.T, r *Record, want int) {
 	got := len((*r))
@@ -340,6 +343,59 @@ func TestRecord_SetFloat64(t *testing.T) {
 			checkRecordLength(t, r, 14)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
 			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 0, 0, 128, 52, 192})
+		},
+	)
+}
+
+func TestRecord_SetBool(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetBool(0, true)
+			r.SetBool(1, false)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 9, 0})
+			checkRecordBytes(t, r, 8, []byte{1, 0})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetBool(0, true)
+			r.SetBool(0, false)
+
+			checkRecordLength(t, r, 7)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0})
+		},
+	)
+}
+
+func TestRecord_SetTime(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetTime(0, time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC))
+			r.SetTime(1, time.Date(2022, 10, 25, 3, 25, 0, 0, time.UTC))
+
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 16, 0})
+			checkRecordBytes(t, r, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0})
+			checkRecordBytes(t, r, 16, []byte{0, 120, 231, 11, 253, 49, 33, 23})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetTime(0, time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC))
+			r.SetTime(0, time.Date(2022, 10, 25, 3, 25, 0, 0, time.UTC))
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 120, 231, 11, 253, 49, 33, 23})
 		},
 	)
 }
