@@ -34,7 +34,7 @@ type RecordOffset int16
 // type Map struct {
 // 	KeyType   ElementType
 // 	ValueType ElementType
-// 	data      map[any]any
+// 	Data      map[any]any
 // }
 
 // -------------------------------------------------------------------------------------------------
@@ -256,10 +256,10 @@ func (r *Record) SerializeMap(m Map) error {
 		return errors.New("maps cannot be values of a map")
 	}
 
-	r.SerializeInt(len(m.data))
+	r.SerializeInt(len(m.Data))
 	*r = append(*r, byte(m.KeyType), byte(m.ValueType))
-	if len(m.data) > 0 {
-		for key, value := range m.data {
+	if len(m.Data) > 0 {
+		for key, value := range m.Data {
 			err := r.serializeAny(key, m.KeyType)
 			if err != nil {
 				return fmt.Errorf("error serializing key '%v' in map: %w", key, err)

@@ -34,11 +34,11 @@ type Array struct {
 type Map struct {
 	KeyType   ElementType
 	ValueType ElementType
-	data      map[any]any
+	Data      map[any]any
 }
 
 // WriteOverflowError is returned when there is not enough space in the record to write the given
-// data.
+// Data.
 type WriteOverflowError struct {
 	availableBytes uint16
 	requiredBytes  uint16
@@ -55,6 +55,22 @@ type TypeMismatchError struct {
 // UnrecognizedTypeError is returned when the type of the user-provided value is not recognized.
 type UnrecognizedTypeError struct {
 	value any
+}
+
+// InvalidElementTypeError is returned when user tries to create an Array with an unsupported
+// element type.
+type InvalidElementTypeError struct {
+	elemType ElementType
+}
+
+// InvalidKeyTypeError is returned when user tries to create a Map with an unsupported key type.
+type InvalidKeyTypeError struct {
+	keyType ElementType
+}
+
+// InvalidValueTypeError is returned when user tries to create a Map with an unsupported value type.
+type InvalidValueTypeError struct {
+	valueType ElementType
 }
 
 func (e *WriteOverflowError) Error() string {
@@ -75,6 +91,30 @@ func (e *TypeMismatchError) Error() string {
 
 func (e *UnrecognizedTypeError) Error() string {
 	return fmt.Sprintf("unrecognized type %T", e.value)
+}
+
+func (e *InvalidElementTypeError) Error() string {
+	elemTypeName, err := nameForElementType(e.elemType)
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("invalid array element type '%s'", elemTypeName)
+}
+
+func (e *InvalidKeyTypeError) Error() string {
+	keyTypeName, err := nameForElementType(e.keyType)
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("invalid map key type '%s'", keyTypeName)
+}
+
+func (e *InvalidValueTypeError) Error() string {
+	valueTypeName, err := nameForElementType(e.valueType)
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("invalid map value type '%s'", valueTypeName)
 }
 
 func nameForElementType(elemType ElementType) (string, error) {
@@ -133,10 +173,10 @@ func bytesNeededForPrimitive(value any) (uint16, error) {
 	return bytesNeeded, err
 }
 
-func bytesNeededForArray(arr Array) (uint16, error) {
+func bytesNeededForArray(a Array) (uint16, error) {
 	var bytesNeeded uint16
 	var err error
-	for _, value := range arr.Values {
+	for _, value := range a.Values {
 		bytesNeededForElement, err := bytesNeededForPrimitive(value)
 		if err != nil {
 			break
@@ -144,6 +184,28 @@ func bytesNeededForArray(arr Array) (uint16, error) {
 		bytesNeeded += bytesNeededForElement
 	}
 	return bytesNeeded + 3, err
+}
+
+func bytesNeededForMap(m Map) (uint16, error) {
+	var bytesNeeded uint16
+	var err error
+	for key, value := range m.Data {
+		bytesNeededForKey, err := bytesNeededForPrimitive(key)
+		if err != nil {
+			break
+		}
+		var bytesNeededForValue uint16
+		if m.ValueType == ARRAY {
+			bytesNeededForValue, err = bytesNeededForArray(value.(Array))
+		} else {
+			bytesNeededForValue, err = bytesNeededForPrimitive(value)
+		}
+		if err != nil {
+			break
+		}
+		bytesNeeded += bytesNeededForKey + bytesNeededForValue
+	}
+	return bytesNeeded + 4, err
 }
 
 func (r *Record) setLength(length uint16) {
@@ -209,79 +271,79 @@ func (r *Record) writePrimitive(offset uint16, value any, expectedType ElementTy
 	var err error
 	switch value.(type) {
 	case uint:
-		err = checkElementType(UINT32)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(UINT32); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint32(offset, uint32(value.(uint)))
 		offsetAfterWrite = offset + 4
 	case uint32:
-		err = checkElementType(UINT32)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(UINT32); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint32(offset, value.(uint32))
 		offsetAfterWrite = offset + 4
 	case uint64:
-		err = checkElementType(UINT64)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(UINT64); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint64(offset, value.(uint64))
 		offsetAfterWrite = offset + 8
 	case int:
-		err = checkElementType(INT32)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(INT32); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint32(offset, uint32(value.(int)))
 		offsetAfterWrite = offset + 4
 	case int32:
-		err = checkElementType(INT32)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(INT32); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint32(offset, uint32(value.(int32)))
 		offsetAfterWrite = offset + 4
 	case int64:
-		err = checkElementType(INT64)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(INT64); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint64(offset, uint64(value.(int64)))
 		offsetAfterWrite = offset + 8
 	case float32:
-		err = checkElementType(FLOAT32)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(FLOAT32); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint32(offset, math.Float32bits(value.(float32)))
 		offsetAfterWrite = offset + 4
 	case float64:
-		err = checkElementType(FLOAT64)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(FLOAT64); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint64(offset, math.Float64bits(value.(float64)))
 		offsetAfterWrite = offset + 8
 	case bool:
-		err = checkElementType(BOOL)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(BOOLEAN); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeByte(offset, value.(bool))
 		offsetAfterWrite = offset + 1
 	case string:
-		err = checkElementType(STRING)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(STRING); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeString(offset, value.(string))
 		offsetAfterWrite = offset + bytesNeededForString(value.(string))
 	case time.Time:
-		err = checkElementType(TIME)
-		if err != nil {
-			return offset, err
+		if err = checkElementType(TIME); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
 		r.writeUint64(offset, uint64(value.(time.Time).UnixNano()))
 		offsetAfterWrite = offset + 8
@@ -291,21 +353,50 @@ func (r *Record) writePrimitive(offset uint16, value any, expectedType ElementTy
 	return offsetAfterWrite, err
 }
 
-func (r *Record) writeArray(offset uint16, arr Array) (uint16, error) {
-	(*r)[offset] = byte(len(arr.Values))
-	offset++
-	(*r)[offset] = byte(len(arr.Values) >> 8)
-	offset++
-	(*r)[offset] = byte(arr.ElementType)
-	offset++
-	for _, value := range arr.Values {
+func (r *Record) writeArray(offset uint16, a Array) (uint16, error) {
+	newOffset := offset
+	(*r)[newOffset] = byte(len(a.Values))
+	newOffset++
+	(*r)[newOffset] = byte(len(a.Values) >> 8)
+	newOffset++
+	(*r)[newOffset] = byte(a.ElementType)
+	newOffset++
+	for _, value := range a.Values {
 		var err error
-		offset, err = r.writePrimitive(offset, value, arr.ElementType)
+		newOffset, err = r.writePrimitive(newOffset, value, a.ElementType)
 		if err != nil {
 			return offset, err
 		}
 	}
-	return offset, nil
+	return newOffset, nil
+}
+
+func (r *Record) writeMap(offset uint16, m Map) (uint16, error) {
+	newOffset := offset
+	(*r)[newOffset] = byte(len(m.Data))
+	newOffset++
+	(*r)[newOffset] = byte(len(m.Data) >> 8)
+	newOffset++
+	(*r)[newOffset] = byte(m.KeyType)
+	newOffset++
+	(*r)[newOffset] = byte(m.ValueType)
+	newOffset++
+	for key, value := range m.Data {
+		var err error
+		newOffset, err = r.writePrimitive(newOffset, key, m.KeyType)
+		if err != nil {
+			return offset, err
+		}
+		if m.ValueType == ARRAY {
+			newOffset, err = r.writeArray(newOffset, value.(Array))
+		} else {
+			newOffset, err = r.writePrimitive(newOffset, value, m.ValueType)
+		}
+		if err != nil {
+			return offset, err
+		}
+	}
+	return newOffset, nil
 }
 
 // NewRecord takes in the number of elements that will be stored in a record and returns a record
@@ -387,11 +478,12 @@ func (r *Record) SetTime(position ElementPosition, value time.Time) {
 	r.SetUint64(position, uint64(value.UnixNano()))
 }
 
-// SetString saves the given string value at the given element position in the record. If a string
-// value is already stored at the given element position and the incoming value is smaller or equal
-// to the length of the existing string, the existing string is overwritten with the new value. If
-// the incoming value is larger than the length of the existing string, a WriteOverflowError is
-// returned.
+// SetString saves the given string value at the given element position in the record.
+//
+// If a string value is already stored at the given element position and the incoming value is
+// smaller or equal to the length of the existing string, the existing string is overwritten with
+// the new value. If the incoming value is larger than the length of the existing string, a
+// WriteOverflowError is returned.
 func (r *Record) SetString(position ElementPosition, value string) error {
 	offset := r.offsetForPosition(position)
 	if offset == 0 {
@@ -414,35 +506,119 @@ func (r *Record) SetString(position ElementPosition, value string) error {
 	return nil
 }
 
-// SetArray saves the given array value at the given element position in the record. If an array
-// value is already stored at the given element position and the incoming value is smaller or equal
-// to the length of the existing array, the existing array is overwritten with the new value. If
-// the incoming value is larger than the length of the existing array, a WriteOverflowError is
-// returned.
-func (r *Record) SetArray(position ElementPosition, data Array) error {
+// SetArray saves the given Array value at the given element position in the record. Arrays cannot
+// have other arrays and maps as elements.
+//
+// If an Array value is already stored at the given element position and the incoming value is
+// smaller or equal to the length of the existing Array, the existing Array is overwritten with the
+// new value. If the incoming value is larger than the length of the existing array, a
+// WriteOverflowError is returned.
+//
+// If the type of incoming Array element type does not match the existing Array element type,
+// a TypeMismatchError is returned.
+func (r *Record) SetArray(position ElementPosition, a Array) error {
+	if a.ElementType == ARRAY {
+		return &InvalidElementTypeError{a.ElementType}
+	}
+	if a.ElementType == MAP {
+		return &InvalidElementTypeError{a.ElementType}
+	}
+	if a.Values == nil {
+		return nil
+	}
+
 	offset := r.offsetForPosition(position)
 	if offset == 0 {
 		offset = r.Length()
-		numBytes, err := bytesNeededForArray(data)
+		numBytes, err := bytesNeededForArray(a)
 		if err != nil {
 			return err
 		}
 		*r = append(*r, make([]byte, numBytes)...)
-		_, err = r.writeArray(offset, data)
+		_, err = r.writeArray(offset, a)
 		if err != nil {
 			return err
 		}
 		r.setOffset(position, offset)
 		r.setLength(offset + numBytes)
 	} else {
+		currentElementType := ElementType((*r)[offset+2])
+		if currentElementType != a.ElementType {
+			return &TypeMismatchError{currentElementType, a.ElementType}
+		}
 		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
-		requiredLength := uint16(len(data.Values))
+		requiredLength := uint16(len(a.Values))
 		if currentLength < requiredLength {
 			return &WriteOverflowError{
-				currentLength, requiredLength, data,
+				currentLength, requiredLength, a,
 			}
 		}
-		_, err := r.writeArray(offset, data)
+		_, err := r.writeArray(offset, a)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetMap saves the given Map value at the given element position in the record. Maps cannot have
+// arrays and other maps as keys. Maps cannot have other maps as values. Maps can have arrays as
+// values.
+//
+// If a Map value is already stored at the given element position and the incoming value is smaller
+// or equal to the length of the existing Map, the existing Map is overwritten with the new value.
+// If the incoming value is larger than the length of the existing Map, a WriteOverflowError is
+// returned.
+//
+// If the type of incoming Map key and value types do not match the existing Map key and value
+// types, a TypeMismatchError is returned.
+func (r *Record) SetMap(position ElementPosition, m Map) error {
+	if m.KeyType == ARRAY {
+		return &InvalidKeyTypeError{m.KeyType}
+	}
+	if m.KeyType == MAP {
+		return &InvalidKeyTypeError{m.KeyType}
+	}
+	if m.ValueType == MAP {
+		return &InvalidValueTypeError{m.ValueType}
+	}
+	if m.Data == nil {
+		return nil
+	}
+
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		numBytes, err := bytesNeededForMap(m)
+		if err != nil {
+			return err
+		}
+		*r = append(*r, make([]byte, numBytes)...)
+		_, err = r.writeMap(offset, m)
+		if err != nil {
+			return err
+		}
+		r.setOffset(position, offset)
+		r.setLength(offset + numBytes)
+	} else {
+		currentKeyType := ElementType((*r)[offset+2])
+		if currentKeyType != m.KeyType {
+			err := &TypeMismatchError{currentKeyType, m.KeyType}
+			return fmt.Errorf("key type mismatch: %w", err)
+		}
+		currentValueType := ElementType((*r)[offset+3])
+		if currentValueType != m.ValueType {
+			err := &TypeMismatchError{currentValueType, m.ValueType}
+			return fmt.Errorf("value type mismatch: %w", err)
+		}
+		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+		requiredLength := uint16(len(m.Data))
+		if currentLength < requiredLength {
+			return &WriteOverflowError{
+				currentLength, requiredLength, m,
+			}
+		}
+		_, err := r.writeMap(offset, m)
 		if err != nil {
 			return err
 		}

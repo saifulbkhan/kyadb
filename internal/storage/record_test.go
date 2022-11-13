@@ -1237,7 +1237,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				t.Errorf("expected no error while deserializing, got %s", err)
 			}
 
-			if len(got.data) != 0 {
+			if len(got.Data) != 0 {
 				t.Errorf("expected map with 0 elements, got %v", got)
 			}
 
@@ -1287,7 +1287,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				t.Errorf("expected no error while deserializing, got %s", err)
 			}
 
-			if len(got.data) != 2 {
+			if len(got.Data) != 2 {
 				t.Errorf("expected map with 2 elements, got %v", got)
 			}
 
@@ -1312,7 +1312,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				)
 			}
 
-			hello, ok := got.data[1]
+			hello, ok := got.Data[1]
 			if !ok {
 				t.Errorf("expected key 1 to be present in map, got %v", got)
 			}
@@ -1320,7 +1320,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				t.Errorf("expected first element to be 'hello', got %s", hello)
 			}
 
-			world, ok := got.data[2]
+			world, ok := got.Data[2]
 			if !ok {
 				t.Errorf("expected key 2 to be present in map, got %v", got)
 			}
@@ -1353,7 +1353,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				t.Errorf("expected no error while deserializing, got %s", err)
 			}
 
-			if len(got.data) != 2 {
+			if len(got.Data) != 2 {
 				t.Errorf("expected map with 2 elements, got %v", got)
 			}
 
@@ -1378,7 +1378,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				)
 			}
 
-			world, ok := got.data["hello"]
+			world, ok := got.Data["hello"]
 			if !ok {
 				t.Errorf("expected key 'hello' to be present in map, got %v", got)
 			}
@@ -1389,7 +1389,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 				}
 			}
 
-			hello, ok := got.data["world"]
+			hello, ok := got.Data["world"]
 			if !ok {
 				t.Errorf("expected key 'world' to be present in map, got %v", got)
 			}

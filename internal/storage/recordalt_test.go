@@ -19,6 +19,16 @@ func checkRecordBytes(t *testing.T, r *Record, offset int, want []byte) {
 	}
 }
 
+func checkRecordBytesOneOf(t *testing.T, r *Record, offset int, want [][]byte) {
+	got := (*r)[offset : offset+len(want[0])]
+	for _, b := range want {
+		if string(got) == string(b) {
+			return
+		}
+	}
+	t.Errorf("expected bytes one of %v, got %v", want, got)
+}
+
 func TestNewRecord(t *testing.T) {
 	numElements := uint16(5)
 	r := NewRecord(numElements)
@@ -500,14 +510,14 @@ func TestRecord_SetArray(t *testing.T) {
 	t.Run(
 		"check empty array", func(t *testing.T) {
 			r := NewRecord(1)
-			err := r.SetArray(0, Array{})
+			err := r.SetArray(0, Array{INT32, []any{}})
 			if err != nil {
 				t.Error(err)
 			}
 
 			checkRecordLength(t, r, 9)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{0, 0, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, byte(INT32)})
 		},
 	)
 
@@ -635,6 +645,192 @@ func TestRecord_SetArray(t *testing.T) {
 			checkRecordBytes(t, r, 4, []byte{8, 0, 15, 0})
 			checkRecordBytes(t, r, 8, []byte{5, 0, 104, 101, 108, 108, 111})
 			checkRecordBytes(t, r, 15, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check array with array element", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{ARRAY, []any{Array{INT32, []any{1, 2}}}})
+			if err == nil {
+				t.Error("expected error when setting array with array elements")
+			}
+		},
+	)
+
+	t.Run(
+		"check array with nil value", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, nil})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 6)
+			checkRecordBytes(t, r, 4, []byte{0, 0})
+		},
+	)
+}
+
+func TestRecord_SetMap(t *testing.T) {
+	t.Run(
+		"check empty map", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{INT32, INT32, map[any]any{}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, byte(INT32), byte(INT32)})
+		},
+	)
+
+	t.Run(
+		"check map with one element", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{INT32, INT32, map[any]any{1: 2}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 18)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(
+				t, r, 6, []byte{1, 0, byte(INT32), byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0},
+			)
+		},
+	)
+
+	t.Run(
+		"check map with two key-value pairs", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{INT32, INT32, map[any]any{1: 2, 3: 4}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 26)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(INT32), byte(INT32)})
+			checkRecordBytesOneOf(
+				t, r, 10, [][]byte{
+					{
+						1, 0, 0, 0,
+						2, 0, 0, 0,
+						3, 0, 0, 0,
+						4, 0, 0, 0,
+					},
+					{
+						3, 0, 0, 0,
+						4, 0, 0, 0,
+						1, 0, 0, 0,
+						2, 0, 0, 0,
+					},
+				},
+			)
+		},
+	)
+
+	t.Run(
+		"check map with string keys", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, map[any]any{"a": 1, "b": 2}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(STRING), byte(INT32)})
+			checkRecordBytesOneOf(
+				t, r, 10, [][]byte{
+					{
+						1, 0, 97,
+						1, 0, 0, 0,
+						1, 0, 98,
+						2, 0, 0, 0,
+					},
+					{
+						1, 0, 98,
+						2, 0, 0, 0,
+						1, 0, 97,
+						1, 0, 0, 0,
+					},
+				},
+			)
+		},
+	)
+
+	t.Run(
+		"check map with array values", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, ARRAY, map[any]any{"a": Array{INT32, []any{1, 2}}}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(
+				t, r, 6, []byte{
+					1, 0,
+					byte(STRING), byte(ARRAY),
+				},
+			)
+			checkRecordBytes(
+				t, r, 10, []byte{
+					1, 0, 97,
+					2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0,
+				},
+			)
+		},
+	)
+
+	t.Run(
+		"check map with map values", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(
+				0,
+				Map{STRING, MAP, map[any]any{"a": Map{INT32, INT32, map[any]any{1: 2}}}},
+			)
+			if err == nil {
+				t.Error("expected error when setting map with map values")
+			}
+		},
+	)
+
+	t.Run(
+		"check map with different key types", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, map[any]any{"a": 1, 2: 3}})
+			if err == nil {
+				t.Error("expected error when setting map with different key types")
+			}
+		},
+	)
+
+	t.Run(
+		"check map with different value types", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, map[any]any{"a": 1, "b": "c"}})
+			if err == nil {
+				t.Error("expected error when setting map with different value types")
+			}
+		},
+	)
+
+	t.Run(
+		"check map with nil value", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, nil})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 6)
+			checkRecordBytes(t, r, 4, []byte{0, 0})
 		},
 	)
 }
