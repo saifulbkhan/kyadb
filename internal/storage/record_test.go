@@ -1001,7 +1001,9 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+5 {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 5, got %d", offset, newOffset,
+					"expected offsetForPosition (%d) to be incremented by 5, got %d",
+					offset,
+					newOffset,
 				)
 			}
 			if got.ElementType != INTEGER {
@@ -1032,7 +1034,9 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+17 {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 14, got %d", offset, newOffset,
+					"expected offsetForPosition (%d) to be incremented by 14, got %d",
+					offset,
+					newOffset,
 				)
 			}
 			if got.ElementType != INTEGER {
@@ -1063,7 +1067,9 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+29 {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 22, got %d", offset, newOffset,
+					"expected offsetForPosition (%d) to be incremented by 22, got %d",
+					offset,
+					newOffset,
 				)
 			}
 			if got.ElementType != LONG {
@@ -1094,7 +1100,9 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+17 {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 14, got %d", offset, newOffset,
+					"expected offsetForPosition (%d) to be incremented by 14, got %d",
+					offset,
+					newOffset,
 				)
 			}
 			if got.ElementType != FLOAT {
@@ -1125,7 +1133,9 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+29 {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 22, got %d", offset, newOffset,
+					"expected offsetForPosition (%d) to be incremented by 22, got %d",
+					offset,
+					newOffset,
 				)
 			}
 			if got.ElementType != DOUBLE {
@@ -1156,7 +1166,7 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+5+2*(4+5) {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 5 + (2 * (4 + 5)), got %d",
+					"expected offsetForPosition (%d) to be incremented by 5 + (2 * (4 + 5)), got %d",
 					offset,
 					newOffset,
 				)
@@ -1195,7 +1205,7 @@ func TestRecord_DeserializeArray(t *testing.T) {
 			}
 			if newOffset != offset+5+2*8 {
 				t.Errorf(
-					"expected offset (%d) to be incremented by 5 + (2 * 8), got %d",
+					"expected offsetForPosition (%d) to be incremented by 5 + (2 * 8), got %d",
 					offset,
 					newOffset,
 				)
@@ -1234,7 +1244,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 			wantOffset := offset + 6
 			if gotOffset != wantOffset {
 				t.Errorf(
-					"expected offset (%d) to be incremented by %d, got %d",
+					"expected offsetForPosition (%d) to be incremented by %d, got %d",
 					offset,
 					wantOffset,
 					gotOffset,
@@ -1284,7 +1294,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 			wantOffset := offset + 6 + 2*(4+4+5)
 			if gotOffset != wantOffset {
 				t.Errorf(
-					"expected offset (%d) to be incremented by %d, got %d",
+					"expected offsetForPosition (%d) to be incremented by %d, got %d",
 					offset,
 					wantOffset,
 					gotOffset,
@@ -1350,7 +1360,7 @@ func TestRecord_DeserializeMap(t *testing.T) {
 			wantOffset := offset + 6 + 2*(4+5+4+1+4+5+2*(4+3))
 			if gotOffset != wantOffset {
 				t.Errorf(
-					"expected offset (%d) to be incremented by %d, got %d",
+					"expected offsetForPosition (%d) to be incremented by %d, got %d",
 					offset,
 					wantOffset,
 					gotOffset,

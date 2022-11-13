@@ -8,20 +8,22 @@ import (
 )
 
 //
-// const (
-// 	INTEGER ElementType = 'i'
-// 	LONG    ElementType = 'l'
-// 	FLOAT   ElementType = 'f'
-// 	DOUBLE  ElementType = 'd'
-// 	BOOLEAN ElementType = 'b'
-// 	STRING  ElementType = 's'
-// 	TIME    ElementType = 't'
-// 	ARRAY   ElementType = 'a'
-// 	MAP     ElementType = 'm'
-// )
+const (
+	INTEGER ElementType = 'i'
+	LONG    ElementType = 'l'
+	FLOAT   ElementType = 'f'
+	DOUBLE  ElementType = 'd'
+	BOOLEAN ElementType = 'b'
+	// 	STRING  ElementType = 's'
+	// 	TIME    ElementType = 't'
+	// 	ARRAY   ElementType = 'a'
+	// 	MAP     ElementType = 'm'
+)
+
 //
 // type Record []byte
-// type RecordOffset int16
+type RecordOffset int16
+
 // type ElementType byte
 //
 // type Array struct {
@@ -43,9 +45,9 @@ import (
 
 // -------------------------------------------------------------------------------------------------
 // Algorithm for storing null values:
-// 1. Use a function to set a null at a given offset (also takes in an element type):
+// 1. Use a function to set a null at a given offsetForPosition (also takes in an element type):
 //    - This function will set the bit for the latest element in bitmap to 1.
-//    - This function however will also store a default value for the element at given byte offset,
+//    - This function however will also store a default value for the element at given byte offsetForPosition,
 //      only if the element type is not a variable-length element like string, array, or map.
 // 2. Use a function to check if a value for a given column ID is null
 //    - This function will just check if the bit at the given column ID (number) is set to 1 in the

@@ -495,3 +495,146 @@ func TestRecord_SetString(t *testing.T) {
 		},
 	)
 }
+
+func TestRecord_SetArray(t *testing.T) {
+	t.Run(
+		"check empty array", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 9)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check array with one element", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 13)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{1, 0, byte(INT32), 1, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check array with two elements", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 17)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check array with two elements of different types", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, "hello"}})
+			if err == nil {
+				t.Error("expected error when setting array with different types")
+			}
+		},
+	)
+
+	t.Run(
+		"check two arrays", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(1, Array{INT32, []any{3, 4}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 30)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 19, 0})
+			checkRecordBytes(t, r, 8, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 19, []byte{2, 0, byte(INT32), 3, 0, 0, 0, 4, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(0, Array{INT32, []any{3, 4}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 17)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(INT32), 3, 0, 0, 0, 4, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check write overflows", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(0, Array{INT32, []any{3, 4, 5}})
+			if err == nil {
+				t.Error("expected error when writing over a shorter array")
+			}
+		},
+	)
+
+	t.Run(
+		"check array followed by string", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetString(1, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 26)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 19, 0})
+			checkRecordBytes(t, r, 8, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 19, []byte{5, 0, 104, 101, 108, 108, 111})
+		},
+	)
+
+	t.Run(
+		"check string followed by array", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(1, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 26)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 15, 0})
+			checkRecordBytes(t, r, 8, []byte{5, 0, 104, 101, 108, 108, 111})
+			checkRecordBytes(t, r, 15, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+		},
+	)
+}
