@@ -1095,3 +1095,115 @@ func TestRecord_GetTime(t *testing.T) {
 		},
 	)
 }
+
+func TestRecord_GetString(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "hello"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got := r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := "hello"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got := r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = "world"
+			err = r.SetString(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got = r.GetString(1)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check empty string", func(t *testing.T) {
+			r := NewRecord(1)
+			want := ""
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got := r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check string with null byte", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "hello\x00world"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got := r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check emoji", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "👍"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got := r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check get after update", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "hello"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got := r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = "guys"
+			err = r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			got = r.GetString(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+}

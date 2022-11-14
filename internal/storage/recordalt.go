@@ -674,3 +674,10 @@ func (r *Record) GetTime(position ElementPosition) time.Time {
 	nanoseconds := binary.LittleEndian.Uint64((*r)[offset : offset+8])
 	return time.Unix(0, int64(nanoseconds))
 }
+
+// GetString returns the string value stored at the given element position in the record.
+func (r *Record) GetString(position ElementPosition) string {
+	offset := r.offsetForPosition(position)
+	length := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	return string((*r)[offset+2 : offset+2+length])
+}
