@@ -1032,3 +1032,66 @@ func TestRecord_GetFloat64(t *testing.T) {
 		},
 	)
 }
+
+func TestRecord_GetBool(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetBool(0, true)
+			got := r.GetBool(0)
+			if got != true {
+				t.Errorf("got %t, want %t", got, true)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetBool(0, true)
+			got := r.GetBool(0)
+			if got != true {
+				t.Errorf("got %t, want %t", got, true)
+			}
+
+			r.SetBool(1, false)
+			got = r.GetBool(1)
+			if got != false {
+				t.Errorf("got %t, want %t", got, false)
+			}
+		},
+	)
+}
+
+func TestRecord_GetTime(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := time.Now().AddDate(0, 0, 1)
+			r.SetTime(0, want)
+			got := r.GetTime(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := time.Now().AddDate(0, 0, 1)
+			r.SetTime(0, want)
+			got := r.GetTime(0)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = time.Now().AddDate(0, 0, 2)
+			r.SetTime(1, want)
+			got = r.GetTime(1)
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+}

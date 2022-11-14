@@ -661,3 +661,16 @@ func (r *Record) GetFloat64(position ElementPosition) float64 {
 	offset := r.offsetForPosition(position)
 	return math.Float64frombits(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
 }
+
+// GetBool returns the bool value stored at the given element position in the record.
+func (r *Record) GetBool(position ElementPosition) bool {
+	offset := r.offsetForPosition(position)
+	return (*r)[offset] != 0
+}
+
+// GetTime returns the Timestamp value stored at the given element position in the record.
+func (r *Record) GetTime(position ElementPosition) time.Time {
+	offset := r.offsetForPosition(position)
+	nanoseconds := binary.LittleEndian.Uint64((*r)[offset : offset+8])
+	return time.Unix(0, int64(nanoseconds))
+}
