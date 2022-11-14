@@ -625,3 +625,39 @@ func (r *Record) SetMap(position ElementPosition, m Map) error {
 	}
 	return nil
 }
+
+// GetUint32 returns the uint32 value stored at the given element position in the record.
+func (r *Record) GetUint32(position ElementPosition) uint32 {
+	offset := r.offsetForPosition(position)
+	return binary.LittleEndian.Uint32((*r)[offset : offset+4])
+}
+
+// GetUint64 returns the uint64 value stored at the given element position in the record.
+func (r *Record) GetUint64(position ElementPosition) uint64 {
+	offset := r.offsetForPosition(position)
+	return binary.LittleEndian.Uint64((*r)[offset : offset+8])
+}
+
+// GetInt32 returns the int32 value stored at the given element position in the record.
+func (r *Record) GetInt32(position ElementPosition) int32 {
+	offset := r.offsetForPosition(position)
+	return int32(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+}
+
+// GetInt64 returns the int64 value stored at the given element position in the record.
+func (r *Record) GetInt64(position ElementPosition) int64 {
+	offset := r.offsetForPosition(position)
+	return int64(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+}
+
+// GetFloat32 returns the float32 value stored at the given element position in the record.
+func (r *Record) GetFloat32(position ElementPosition) float32 {
+	offset := r.offsetForPosition(position)
+	return math.Float32frombits(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+}
+
+// GetFloat64 returns the float64 value stored at the given element position in the record.
+func (r *Record) GetFloat64(position ElementPosition) float64 {
+	offset := r.offsetForPosition(position)
+	return math.Float64frombits(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+}

@@ -834,3 +834,201 @@ func TestRecord_SetMap(t *testing.T) {
 		},
 	)
 }
+
+func TestRecord_GetUint32(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := uint32(10)
+			r.SetUint32(0, want)
+			got := r.GetUint32(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := uint32(10)
+			r.SetUint32(0, want)
+			got := r.GetUint32(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = uint32(20)
+			r.SetUint32(1, want)
+			got = r.GetUint32(1)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetUint64(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := uint64(10)
+			r.SetUint64(0, want)
+			got := r.GetUint64(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := uint64(10)
+			r.SetUint64(0, want)
+			got := r.GetUint64(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = uint64(20)
+			r.SetUint64(1, want)
+			got = r.GetUint64(1)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetInt32(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := int32(10)
+			r.SetInt32(0, want)
+			got := r.GetInt32(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := int32(10)
+			r.SetInt32(0, want)
+			got := r.GetInt32(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = int32(20)
+			r.SetInt32(1, want)
+			got = r.GetInt32(1)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetInt64(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := int64(10)
+			r.SetInt64(0, want)
+			got := r.GetInt64(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := int64(10)
+			r.SetInt64(0, want)
+			got := r.GetInt64(0)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = int64(20)
+			r.SetInt64(1, want)
+			got = r.GetInt64(1)
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetFloat32(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := float32(10.01)
+			r.SetFloat32(0, want)
+			got := r.GetFloat32(0)
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := float32(10.01)
+			r.SetFloat32(0, want)
+			got := r.GetFloat32(0)
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+
+			want = float32(20.02)
+			r.SetFloat32(1, want)
+			got = r.GetFloat32(1)
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetFloat64(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := 10.01
+			r.SetFloat64(0, want)
+			got := r.GetFloat64(0)
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := 10.01
+			r.SetFloat64(0, want)
+			got := r.GetFloat64(0)
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+
+			want = 20.02
+			r.SetFloat64(1, want)
+			got = r.GetFloat64(1)
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+}
