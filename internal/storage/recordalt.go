@@ -242,7 +242,7 @@ func (r *Record) writeUint64(offset uint16, value uint64) {
 	(*r)[offset+7] = byte(value >> 56)
 }
 
-func (r *Record) writeByte(offset uint16, value bool) {
+func (r *Record) writeBool(offset uint16, value bool) {
 	if value {
 		(*r)[offset] = 1
 	} else {
@@ -331,7 +331,7 @@ func (r *Record) writePrimitive(offset uint16, value any, expectedType ElementTy
 			offsetAfterWrite = offset
 			break
 		}
-		r.writeByte(offset, value.(bool))
+		r.writeBool(offset, value.(bool))
 		offsetAfterWrite = offset + 1
 	case string:
 		if err = checkElementType(STRING); err != nil {
@@ -397,6 +397,78 @@ func (r *Record) writeMap(offset uint16, m Map) (uint16, error) {
 		}
 	}
 	return newOffset, nil
+}
+
+func (r *Record) readUint32(offset uint16) uint32 {
+	return binary.LittleEndian.Uint32((*r)[offset : offset+4])
+}
+
+func (r *Record) readUint64(offset uint16) uint64 {
+	return binary.LittleEndian.Uint64((*r)[offset : offset+8])
+}
+
+func (r *Record) readBool(offset uint16) bool {
+	return (*r)[offset] == 1
+}
+
+func (r *Record) readString(offset uint16) (string, uint16) {
+	strLen := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	return string((*r)[offset+2 : offset+2+strLen]), strLen
+}
+
+func (r *Record) readPrimitive(offset uint16, expectedType ElementType) (any, uint16, error) {
+	var value any
+	var offsetAfterRead uint16
+	var err error
+	switch expectedType {
+	case UINT32:
+		value = r.readUint32(offset)
+		offsetAfterRead = offset + 4
+	case UINT64:
+		value = r.readUint64(offset)
+		offsetAfterRead = offset + 8
+	case INT32:
+		value = int32(r.readUint32(offset))
+		offsetAfterRead = offset + 4
+	case INT64:
+		value = int64(r.readUint64(offset))
+		offsetAfterRead = offset + 8
+	case FLOAT32:
+		value = math.Float32frombits(r.readUint32(offset))
+		offsetAfterRead = offset + 4
+	case FLOAT64:
+		value = math.Float64frombits(r.readUint64(offset))
+		offsetAfterRead = offset + 8
+	case BOOLEAN:
+		value = r.readBool(offset)
+		offsetAfterRead = offset + 1
+	case STRING:
+		strValue, strLen := r.readString(offset)
+		value = strValue
+		offsetAfterRead = offset + strLen + 2
+	case TIME:
+		value = time.Unix(0, int64(r.readUint64(offset)))
+		offsetAfterRead = offset + 8
+	default:
+		err = fmt.Errorf("unsupported primitive type %v", expectedType)
+	}
+	return value, offsetAfterRead, err
+}
+
+func (r *Record) readArray(offset uint16) (Array, uint16, error) {
+	arrayLen := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	offset += 2
+	elementType := ElementType((*r)[offset])
+	offset++
+	a := Array{Values: make([]any, arrayLen), ElementType: elementType}
+	for i := uint16(0); i < arrayLen; i++ {
+		var err error
+		a.Values[i], offset, err = r.readPrimitive(offset, elementType)
+		if err != nil {
+			return a, offset, err
+		}
+	}
+	return a, offset, nil
 }
 
 // NewRecord takes in the number of elements that will be stored in a record and returns a record
@@ -470,7 +542,7 @@ func (r *Record) SetBool(position ElementPosition, value bool) {
 		r.setOffset(position, offset)
 		*r = append(*r, byte(0))
 	}
-	r.writeByte(offset, value)
+	r.writeBool(offset, value)
 }
 
 // SetTime saves the given time value at the given element position in the record.
@@ -711,8 +783,17 @@ func (r *Record) GetString(position ElementPosition) (isNull bool, value string)
 	offset := r.offsetForPosition(position)
 	isNull = offset == 0
 	if !isNull {
-		length := binary.LittleEndian.Uint16((*r)[offset : offset+2])
-		value = string((*r)[offset+2 : offset+2+length])
+		value, _ = r.readString(offset)
 	}
 	return isNull, value
+}
+
+// GetArray returns the Array value stored at the given element position in the record.
+func (r *Record) GetArray(position ElementPosition) (isNull bool, value Array, err error) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value, _, err = r.readArray(offset)
+	}
+	return isNull, value, err
 }

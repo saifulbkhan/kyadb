@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"reflect"
 	"testing"
 	"time"
 )
@@ -1299,6 +1300,174 @@ func TestRecord_GetString(t *testing.T) {
 			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetArray(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Array{STRING, []any{"foo", "bar"}}
+			err = r.SetArray(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetArray(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check empty array", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check array with null byte", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{"hello\x00world", "foo\x00bar"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check get after update", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Array{STRING, []any{"foo", "bar"}}
+			err = r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check first array is null but second is not", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			isNull, got, err = r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if !isNull {
+				t.Errorf("expected null value, but got %v", got)
 			}
 		},
 	)
