@@ -841,7 +841,10 @@ func TestRecord_GetUint32(t *testing.T) {
 			r := NewRecord(1)
 			want := uint32(10)
 			r.SetUint32(0, want)
-			got := r.GetUint32(0)
+			isNull, got := r.GetUint32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -853,14 +856,20 @@ func TestRecord_GetUint32(t *testing.T) {
 			r := NewRecord(2)
 			want := uint32(10)
 			r.SetUint32(0, want)
-			got := r.GetUint32(0)
+			isNull, got := r.GetUint32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
 
 			want = uint32(20)
 			r.SetUint32(1, want)
-			got = r.GetUint32(1)
+			isNull, got = r.GetUint32(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -874,7 +883,10 @@ func TestRecord_GetUint64(t *testing.T) {
 			r := NewRecord(1)
 			want := uint64(10)
 			r.SetUint64(0, want)
-			got := r.GetUint64(0)
+			isNull, got := r.GetUint64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -886,14 +898,20 @@ func TestRecord_GetUint64(t *testing.T) {
 			r := NewRecord(2)
 			want := uint64(10)
 			r.SetUint64(0, want)
-			got := r.GetUint64(0)
+			isNull, got := r.GetUint64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
 
 			want = uint64(20)
 			r.SetUint64(1, want)
-			got = r.GetUint64(1)
+			isNull, got = r.GetUint64(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -907,7 +925,10 @@ func TestRecord_GetInt32(t *testing.T) {
 			r := NewRecord(1)
 			want := int32(10)
 			r.SetInt32(0, want)
-			got := r.GetInt32(0)
+			isNull, got := r.GetInt32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -919,14 +940,20 @@ func TestRecord_GetInt32(t *testing.T) {
 			r := NewRecord(2)
 			want := int32(10)
 			r.SetInt32(0, want)
-			got := r.GetInt32(0)
+			isNull, got := r.GetInt32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
 
 			want = int32(20)
 			r.SetInt32(1, want)
-			got = r.GetInt32(1)
+			isNull, got = r.GetInt32(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -940,7 +967,10 @@ func TestRecord_GetInt64(t *testing.T) {
 			r := NewRecord(1)
 			want := int64(10)
 			r.SetInt64(0, want)
-			got := r.GetInt64(0)
+			isNull, got := r.GetInt64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -952,14 +982,20 @@ func TestRecord_GetInt64(t *testing.T) {
 			r := NewRecord(2)
 			want := int64(10)
 			r.SetInt64(0, want)
-			got := r.GetInt64(0)
+			isNull, got := r.GetInt64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
 
 			want = int64(20)
 			r.SetInt64(1, want)
-			got = r.GetInt64(1)
+			isNull, got = r.GetInt64(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
@@ -973,7 +1009,10 @@ func TestRecord_GetFloat32(t *testing.T) {
 			r := NewRecord(1)
 			want := float32(10.01)
 			r.SetFloat32(0, want)
-			got := r.GetFloat32(0)
+			isNull, got := r.GetFloat32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %f, want %f", got, want)
 			}
@@ -985,14 +1024,20 @@ func TestRecord_GetFloat32(t *testing.T) {
 			r := NewRecord(2)
 			want := float32(10.01)
 			r.SetFloat32(0, want)
-			got := r.GetFloat32(0)
+			isNull, got := r.GetFloat32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %f, want %f", got, want)
 			}
 
 			want = float32(20.02)
 			r.SetFloat32(1, want)
-			got = r.GetFloat32(1)
+			isNull, got = r.GetFloat32(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %f, want %f", got, want)
 			}
@@ -1006,7 +1051,10 @@ func TestRecord_GetFloat64(t *testing.T) {
 			r := NewRecord(1)
 			want := 10.01
 			r.SetFloat64(0, want)
-			got := r.GetFloat64(0)
+			isNull, got := r.GetFloat64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %f, want %f", got, want)
 			}
@@ -1018,14 +1066,20 @@ func TestRecord_GetFloat64(t *testing.T) {
 			r := NewRecord(2)
 			want := 10.01
 			r.SetFloat64(0, want)
-			got := r.GetFloat64(0)
+			isNull, got := r.GetFloat64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %f, want %f", got, want)
 			}
 
 			want = 20.02
 			r.SetFloat64(1, want)
-			got = r.GetFloat64(1)
+			isNull, got = r.GetFloat64(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %f, want %f", got, want)
 			}
@@ -1038,7 +1092,10 @@ func TestRecord_GetBool(t *testing.T) {
 		"check basic get", func(t *testing.T) {
 			r := NewRecord(1)
 			r.SetBool(0, true)
-			got := r.GetBool(0)
+			isNull, got := r.GetBool(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != true {
 				t.Errorf("got %t, want %t", got, true)
 			}
@@ -1049,13 +1106,19 @@ func TestRecord_GetBool(t *testing.T) {
 		"check two fields", func(t *testing.T) {
 			r := NewRecord(2)
 			r.SetBool(0, true)
-			got := r.GetBool(0)
+			isNull, got := r.GetBool(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != true {
 				t.Errorf("got %t, want %t", got, true)
 			}
 
 			r.SetBool(1, false)
-			got = r.GetBool(1)
+			isNull, got = r.GetBool(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != false {
 				t.Errorf("got %t, want %t", got, false)
 			}
@@ -1069,7 +1132,10 @@ func TestRecord_GetTime(t *testing.T) {
 			r := NewRecord(1)
 			want := time.Now().AddDate(0, 0, 1)
 			r.SetTime(0, want)
-			got := r.GetTime(0)
+			isNull, got := r.GetTime(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1081,14 +1147,20 @@ func TestRecord_GetTime(t *testing.T) {
 			r := NewRecord(2)
 			want := time.Now().AddDate(0, 0, 1)
 			r.SetTime(0, want)
-			got := r.GetTime(0)
+			isNull, got := r.GetTime(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
 
 			want = time.Now().AddDate(0, 0, 2)
 			r.SetTime(1, want)
-			got = r.GetTime(1)
+			isNull, got = r.GetTime(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1105,7 +1177,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got := r.GetString(0)
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1120,7 +1195,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got := r.GetString(0)
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1130,7 +1208,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got = r.GetString(1)
+			isNull, got = r.GetString(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1145,7 +1226,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got := r.GetString(0)
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1160,7 +1244,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got := r.GetString(0)
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1175,7 +1262,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got := r.GetString(0)
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1190,7 +1280,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got := r.GetString(0)
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}
@@ -1200,7 +1293,10 @@ func TestRecord_GetString(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			got = r.GetString(0)
+			isNull, got = r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
 			if got != want {
 				t.Errorf("got %v, want %v", got, want)
 			}

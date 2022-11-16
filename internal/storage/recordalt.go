@@ -627,57 +627,92 @@ func (r *Record) SetMap(position ElementPosition, m Map) error {
 }
 
 // GetUint32 returns the uint32 value stored at the given element position in the record.
-func (r *Record) GetUint32(position ElementPosition) uint32 {
+func (r *Record) GetUint32(position ElementPosition) (isNull bool, value uint32) {
 	offset := r.offsetForPosition(position)
-	return binary.LittleEndian.Uint32((*r)[offset : offset+4])
+	isNull = offset == 0
+	if !isNull {
+		value = binary.LittleEndian.Uint32((*r)[offset : offset+4])
+	}
+	return isNull, value
 }
 
 // GetUint64 returns the uint64 value stored at the given element position in the record.
-func (r *Record) GetUint64(position ElementPosition) uint64 {
+func (r *Record) GetUint64(position ElementPosition) (isNull bool, value uint64) {
 	offset := r.offsetForPosition(position)
-	return binary.LittleEndian.Uint64((*r)[offset : offset+8])
+	isNull = offset == 0
+	if !isNull {
+		value = binary.LittleEndian.Uint64((*r)[offset : offset+8])
+	}
+	return isNull, value
 }
 
 // GetInt32 returns the int32 value stored at the given element position in the record.
-func (r *Record) GetInt32(position ElementPosition) int32 {
+func (r *Record) GetInt32(position ElementPosition) (isNull bool, value int32) {
 	offset := r.offsetForPosition(position)
-	return int32(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+	isNull = offset == 0
+	if !isNull {
+		value = int32(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+	}
+	return isNull, value
 }
 
 // GetInt64 returns the int64 value stored at the given element position in the record.
-func (r *Record) GetInt64(position ElementPosition) int64 {
+func (r *Record) GetInt64(position ElementPosition) (isNull bool, value int64) {
 	offset := r.offsetForPosition(position)
-	return int64(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+	isNull = offset == 0
+	if !isNull {
+		value = int64(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+	}
+	return isNull, value
 }
 
 // GetFloat32 returns the float32 value stored at the given element position in the record.
-func (r *Record) GetFloat32(position ElementPosition) float32 {
+func (r *Record) GetFloat32(position ElementPosition) (isNull bool, value float32) {
 	offset := r.offsetForPosition(position)
-	return math.Float32frombits(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+	isNull = offset == 0
+	if !isNull {
+		value = math.Float32frombits(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+	}
+	return isNull, value
 }
 
 // GetFloat64 returns the float64 value stored at the given element position in the record.
-func (r *Record) GetFloat64(position ElementPosition) float64 {
+func (r *Record) GetFloat64(position ElementPosition) (isNull bool, value float64) {
 	offset := r.offsetForPosition(position)
-	return math.Float64frombits(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+	isNull = offset == 0
+	if !isNull {
+		value = math.Float64frombits(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+	}
+	return isNull, value
 }
 
 // GetBool returns the bool value stored at the given element position in the record.
-func (r *Record) GetBool(position ElementPosition) bool {
+func (r *Record) GetBool(position ElementPosition) (isNull bool, value bool) {
 	offset := r.offsetForPosition(position)
-	return (*r)[offset] != 0
+	isNull = offset == 0
+	if !isNull {
+		value = (*r)[offset] != 0
+	}
+	return isNull, value
 }
 
 // GetTime returns the Timestamp value stored at the given element position in the record.
-func (r *Record) GetTime(position ElementPosition) time.Time {
+func (r *Record) GetTime(position ElementPosition) (isNull bool, value time.Time) {
 	offset := r.offsetForPosition(position)
-	nanoseconds := binary.LittleEndian.Uint64((*r)[offset : offset+8])
-	return time.Unix(0, int64(nanoseconds))
+	isNull = offset == 0
+	if !isNull {
+		value = time.Unix(0, int64(binary.LittleEndian.Uint64((*r)[offset:offset+8])))
+	}
+	return isNull, value
 }
 
 // GetString returns the string value stored at the given element position in the record.
-func (r *Record) GetString(position ElementPosition) string {
+func (r *Record) GetString(position ElementPosition) (isNull bool, value string) {
 	offset := r.offsetForPosition(position)
-	length := binary.LittleEndian.Uint16((*r)[offset : offset+2])
-	return string((*r)[offset+2 : offset+2+length])
+	isNull = offset == 0
+	if !isNull {
+		length := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+		value = string((*r)[offset+2 : offset+2+length])
+	}
+	return isNull, value
 }
