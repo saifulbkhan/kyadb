@@ -471,6 +471,33 @@ func (r *Record) readArray(offset uint16) (Array, uint16, error) {
 	return a, offset, nil
 }
 
+func (r *Record) readMap(offset uint16) (Map, uint16, error) {
+	mapLen := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	offset += 2
+	keyType := ElementType((*r)[offset])
+	offset++
+	valueType := ElementType((*r)[offset])
+	offset++
+	m := Map{Data: make(map[any]any), KeyType: keyType, ValueType: valueType}
+	for i := uint16(0); i < mapLen; i++ {
+		var key any
+		var err error
+		key, offset, err = r.readPrimitive(offset, keyType)
+		if err != nil {
+			return m, offset, err
+		}
+		if valueType == ARRAY {
+			m.Data[key], offset, err = r.readArray(offset)
+		} else {
+			m.Data[key], offset, err = r.readPrimitive(offset, valueType)
+		}
+		if err != nil {
+			return m, offset, err
+		}
+	}
+	return m, offset, nil
+}
+
 // NewRecord takes in the number of elements that will be stored in a record and returns a record
 // initialized with the appropriate length, header length and offsets for element positions. All
 // offsets are initialized to 0, meaning that the values for those element positions are null by
@@ -794,6 +821,16 @@ func (r *Record) GetArray(position ElementPosition) (isNull bool, value Array, e
 	isNull = offset == 0
 	if !isNull {
 		value, _, err = r.readArray(offset)
+	}
+	return isNull, value, err
+}
+
+// GetMap returns the Map value stored at the given element position in the record.
+func (r *Record) GetMap(position ElementPosition) (isNull bool, value Map, err error) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value, _, err = r.readMap(offset)
 	}
 	return isNull, value, err
 }

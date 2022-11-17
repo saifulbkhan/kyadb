@@ -793,8 +793,7 @@ func TestRecord_SetMap(t *testing.T) {
 		"check map with map values", func(t *testing.T) {
 			r := NewRecord(1)
 			err := r.SetMap(
-				0,
-				Map{STRING, MAP, map[any]any{"a": Map{INT32, INT32, map[any]any{1: 2}}}},
+				0, Map{STRING, MAP, map[any]any{"a": Map{INT32, INT32, map[any]any{1: 2}}}},
 			)
 			if err == nil {
 				t.Error("expected error when setting map with map values")
@@ -1468,6 +1467,180 @@ func TestRecord_GetArray(t *testing.T) {
 			}
 			if !isNull {
 				t.Errorf("expected null value, but got %v", got)
+			}
+		},
+	)
+}
+
+func TestRecord_GetMap(t *testing.T) {
+	t.Run(
+		"check single field", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Map{STRING, STRING, map[any]any{"foo": "bar"}}
+			err = r.SetMap(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetMap(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check empty map", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{STRING, STRING, map[any]any{}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check get after update", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Map{STRING, STRING, map[any]any{"foo": "bar"}}
+			err = r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check first map is null but second is not", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			isNull, got, err = r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if !isNull {
+				t.Errorf("expected null value, but got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"check map with array values", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{
+				STRING,
+				ARRAY,
+				map[any]any{
+					"hello": Array{STRING, []any{"world", "foo", "bar"}},
+				},
+			}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
 			}
 		},
 	)
