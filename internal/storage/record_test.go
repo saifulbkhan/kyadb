@@ -1,27 +1,27 @@
 package storage
 
 import (
-	"math"
+	"reflect"
 	"testing"
 	"time"
 )
 
-func checkLength(t *testing.T, r Record, want int) {
-	got := len(r)
+func checkRecordLength(t *testing.T, r *Record, want int) {
+	got := len(*r)
 	if got != want {
 		t.Errorf("expected length %d, got %d", want, got)
 	}
 }
 
-func checkBytes(t *testing.T, r Record, offset int, want []byte) {
-	got := r[offset : offset+len(want)]
+func checkRecordBytes(t *testing.T, r *Record, offset int, want []byte) {
+	got := (*r)[offset : offset+len(want)]
 	if string(got) != string(want) {
 		t.Errorf("expected bytes %v, got %v", want, got)
 	}
 }
 
-func checkBytesOneOf(t *testing.T, r Record, offset int, want [][]byte) {
-	got := r[offset : offset+len(want[0])]
+func checkRecordBytesOneOf(t *testing.T, r *Record, offset int, want [][]byte) {
+	got := (*r)[offset : offset+len(want[0])]
 	for _, b := range want {
 		if string(got) == string(b) {
 			return
@@ -30,1374 +30,1617 @@ func checkBytesOneOf(t *testing.T, r Record, offset int, want [][]byte) {
 	t.Errorf("expected bytes one of %v, got %v", want, got)
 }
 
-func TestRecord_SerializeInt(t *testing.T) {
-	t.Parallel()
+func TestNewRecord(t *testing.T) {
+	numElements := uint16(5)
+	r := NewRecord(numElements)
 
+	checkRecordLength(t, r, 14)
+	checkRecordBytes(t, r, 0, []byte{14, 0})
+	checkRecordBytes(t, r, 2, []byte{12, 0})
+	checkRecordBytes(t, r, 4, []byte{0, 0, 0, 0, 0, 0})
+}
+
+func TestRecord_Length(t *testing.T) {
 	t.Run(
-		"check length with three appends", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeInt(1)
-			checkLength(t, r, 4)
-
-			r.SerializeInt(1)
-			checkLength(t, r, 8)
-
-			r.SerializeInt(1)
-			checkLength(t, r, 12)
+		"length zero", func(t *testing.T) {
+			r := Record(make([]byte, 2))
+			want := uint16(0)
+			got := r.Length()
+			if got != want {
+				t.Errorf("expected length %d, got %d", want, got)
+			}
 		},
 	)
 
 	t.Run(
-		"check byte arrangement", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeInt(1)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 1})
-
-			r.SerializeInt(int(math.Pow(2, 8)))
-			checkBytes(t, r, 4, []byte{0, 0, 1, 0})
-
-			r.SerializeInt(int(math.Pow(2, 16)))
-			checkBytes(t, r, 8, []byte{0, 1, 0, 0})
-
-			r.SerializeInt(math.MaxInt32)
-			checkBytes(t, r, 12, []byte{127, 255, 255, 255})
-
-			r.SerializeInt(-1)
-			checkBytes(t, r, 16, []byte{255, 255, 255, 255})
+		"length non-zero", func(t *testing.T) {
+			r := NewRecord(2)
+			got := r.Length()
+			want := uint16(8)
+			if got != want {
+				t.Errorf("expected length %d, got %d", want, got)
+			}
 		},
 	)
 }
 
-func TestRecord_SerializeLong(t *testing.T) {
-	t.Parallel()
-
+func TestRecord_SetUint32(t *testing.T) {
 	t.Run(
-		"check length with three appends", func(t *testing.T) {
-			r := Record{}
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetUint32(0, 10)
+			r.SetUint32(1, 20)
 
-			r.SerializeLong(1)
-			checkLength(t, r, 8)
-
-			r.SerializeLong(1)
-			checkLength(t, r, 16)
-
-			r.SerializeLong(1)
-			checkLength(t, r, 24)
+			checkRecordLength(t, r, 16)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 12, 0})
+			checkRecordBytes(t, r, 8, []byte{10, 0, 0, 0})
+			checkRecordBytes(t, r, 12, []byte{20, 0, 0, 0})
 		},
 	)
 
 	t.Run(
-		"check byte arrangement", func(t *testing.T) {
-			r := Record{}
+		"check smallest uint32", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint32(0, 0)
 
-			r.SerializeLong(1)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 0, 0, 0, 0, 1})
-
-			r.SerializeLong(int64(math.Pow(2, 8)))
-			checkBytes(t, r, 8, []byte{0, 0, 0, 0, 0, 0, 1, 0})
-
-			r.SerializeLong(int64(math.Pow(2, 16)))
-			checkBytes(t, r, 16, []byte{0, 0, 0, 0, 0, 1, 0, 0})
-
-			r.SerializeLong(int64(math.Pow(2, 32)))
-			checkBytes(t, r, 24, []byte{0, 0, 0, 1, 0, 0, 0, 0})
-
-			r.SerializeLong(math.MaxInt64)
-			checkBytes(t, r, 32, []byte{127, 255, 255, 255, 255, 255, 255, 255})
-
-			r.SerializeLong(-1)
-			checkBytes(t, r, 40, []byte{255, 255, 255, 255, 255, 255, 255, 255})
-		},
-	)
-}
-
-func TestRecord_SerializeFloat(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check length with three appends", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeFloat(1.0)
-			checkLength(t, r, 4)
-
-			r.SerializeFloat(0.0)
-			checkLength(t, r, 8)
-
-			r.SerializeFloat(-1.0)
-			checkLength(t, r, 12)
-		},
-	)
-
-	// TODO: check byte arrangement
-}
-
-func TestRecord_SerializeDouble(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check length with three appends", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeDouble(1.0)
-			checkLength(t, r, 8)
-
-			r.SerializeDouble(0.0)
-			checkLength(t, r, 16)
-
-			r.SerializeDouble(-1.0)
-			checkLength(t, r, 24)
-		},
-	)
-
-	// TODO: check byte arrangement
-}
-
-func TestRecord_SerializeBool(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check value of true", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeBool(true)
-			checkBytes(t, r, 0, []byte{1})
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 0})
 		},
 	)
 
 	t.Run(
-		"check value of false", func(t *testing.T) {
-			r := Record{}
+		"check largest uint32", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint32(0, 4294967295)
 
-			r.SerializeBool(false)
-			checkBytes(t, r, 0, []byte{0})
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint32(0, 10)
+			r.SetUint32(0, 20)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{20, 0, 0, 0})
 		},
 	)
 }
 
-func TestRecord_SerializeString(t *testing.T) {
-	t.Parallel()
-
+func TestRecord_SetUint64(t *testing.T) {
 	t.Run(
-		"check empty string append", func(t *testing.T) {
-			r := Record{}
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetUint64(0, 10)
+			r.SetUint64(1, 20)
 
-			r.SerializeString("")
-			checkLength(t, r, 4)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 0})
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 16, 0})
+			checkRecordBytes(t, r, 8, []byte{10, 0, 0, 0, 0, 0, 0, 0})
+			checkRecordBytes(t, r, 16, []byte{20, 0, 0, 0, 0, 0, 0, 0})
 		},
 	)
 
 	t.Run(
-		"check string append", func(t *testing.T) {
-			r := Record{}
+		"check smallest uint64", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint64(0, 0)
 
-			r.SerializeString("hello")
-			checkLength(t, r, 9)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 5, 104, 101, 108, 108, 111})
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 0, 0, 0, 0, 0})
 		},
 	)
 
 	t.Run(
-		"check string append with null character", func(t *testing.T) {
-			r := Record{}
+		"check largest uint64", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint64(0, 18446744073709551615)
 
-			r.SerializeString("hello\x00world")
-			checkLength(t, r, 15)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 11, 104, 101, 108, 108, 111, 0, 119, 111, 114, 108, 100,
-				},
-			)
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 255, 255})
 		},
 	)
 
 	t.Run(
-		"check string append with emoji", func(t *testing.T) {
-			r := Record{}
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetUint64(0, 10)
+			r.SetUint64(0, 20)
 
-			r.SerializeString("😎")
-			checkLength(t, r, 8)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 4, 240, 159, 152, 142})
-		},
-	)
-}
-
-func TestRecord_SerializeTime(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check time append epoch", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeTime(
-				time.Date(
-					1970, 1, 1, 0, 0, 0, 0, time.UTC,
-				),
-			)
-			checkLength(t, r, 8)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 0, 0, 0, 0, 0})
-		},
-	)
-
-	t.Run(
-		"check time append", func(t *testing.T) {
-			r := Record{}
-
-			r.SerializeTime(
-				time.Date(2022, 10, 25, 0, 0, 0, 0, time.UTC),
-			)
-			checkLength(t, r, 8)
-			checkBytes(t, r, 0, []byte{23, 33, 38, 205, 58, 198, 0, 0})
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{20, 0, 0, 0, 0, 0, 0, 0})
 		},
 	)
 }
 
-func TestRecord_SerializeArray(t *testing.T) {
-	t.Parallel()
-
+func TestRecord_SetInt32(t *testing.T) {
 	t.Run(
-		"check empty array append", func(t *testing.T) {
-			r := Record{}
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetInt32(0, 10)
+			r.SetInt32(1, -20)
 
-			err := r.SerializeArray(Array{INTEGER, []any{}})
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 5)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 0, byte(INTEGER)})
+			checkRecordLength(t, r, 16)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 12, 0})
+			checkRecordBytes(t, r, 8, []byte{10, 0, 0, 0})
+			checkRecordBytes(t, r, 12, []byte{236, 255, 255, 255})
 		},
 	)
 
 	t.Run(
-		"check integer array append", func(t *testing.T) {
-			r := Record{}
+		"check smallest int32", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt32(0, -2147483648)
 
-			err := r.SerializeArray(Array{INTEGER, []any{1, 2, 3}})
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 128})
+		},
+	)
+
+	t.Run(
+		"check largest int32", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt32(0, 2147483647)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 127})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt32(0, 10)
+			r.SetInt32(0, -20)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{236, 255, 255, 255})
+		},
+	)
+}
+
+func TestRecord_SetInt64(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetInt64(0, 10)
+			r.SetInt64(1, -20)
+
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 16, 0})
+			checkRecordBytes(t, r, 8, []byte{10, 0, 0, 0, 0, 0, 0, 0})
+			checkRecordBytes(t, r, 16, []byte{236, 255, 255, 255, 255, 255, 255, 255})
+		},
+	)
+
+	t.Run(
+		"check smallest int64", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt64(0, -9223372036854775808)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 0, 0, 0, 0, 128})
+		},
+	)
+
+	t.Run(
+		"check largest int64", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt64(0, 9223372036854775807)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 255, 127})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetInt64(0, 10)
+			r.SetInt64(0, -20)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{236, 255, 255, 255, 255, 255, 255, 255})
+		},
+	)
+}
+
+func TestRecord_SetFloat32(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetFloat32(0, 10.5)
+			r.SetFloat32(1, -20.5)
+
+			checkRecordLength(t, r, 16)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 12, 0})
+			checkRecordBytes(t, r, 8, []byte{0, 0, 40, 65})
+			checkRecordBytes(t, r, 12, []byte{0, 0, 164, 193})
+		},
+	)
+
+	t.Run(
+		"check smallest float32", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat32(0, -3.40282346638528859811704183484516925440e+38)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 127, 255})
+		},
+	)
+
+	t.Run(
+		"check largest float32", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat32(0, 3.40282346638528859811704183484516925440e+38)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 127, 127})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat32(0, 10.5)
+			r.SetFloat32(0, -20.5)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 164, 193})
+		},
+	)
+}
+
+func TestRecord_SetFloat64(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetFloat64(0, 10.5)
+			r.SetFloat64(1, -20.5)
+
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 16, 0})
+			checkRecordBytes(t, r, 8, []byte{0, 0, 0, 0, 0, 0, 37, 64})
+			checkRecordBytes(t, r, 16, []byte{0, 0, 0, 0, 0, 128, 52, 192})
+		},
+	)
+
+	t.Run(
+		"check smallest float64", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat64(0, -1.797693134862315708145274237317043567981e+308)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 239, 255})
+		},
+	)
+
+	t.Run(
+		"check largest float64", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat64(0, 1.797693134862315708145274237317043567981e+308)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{255, 255, 255, 255, 255, 255, 239, 127})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetFloat64(0, 10.5)
+			r.SetFloat64(0, -20.5)
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, 0, 0, 0, 128, 52, 192})
+		},
+	)
+}
+
+func TestRecord_SetBool(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetBool(0, true)
+			r.SetBool(1, false)
+
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 9, 0})
+			checkRecordBytes(t, r, 8, []byte{1, 0})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetBool(0, true)
+			r.SetBool(0, false)
+
+			checkRecordLength(t, r, 7)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0})
+		},
+	)
+}
+
+func TestRecord_SetTime(t *testing.T) {
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetTime(0, time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC))
+			r.SetTime(1, time.Date(2022, 10, 25, 3, 25, 0, 0, time.UTC))
+
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 16, 0})
+			checkRecordBytes(t, r, 8, []byte{0, 0, 0, 0, 0, 0, 0, 0})
+			checkRecordBytes(t, r, 16, []byte{0, 120, 231, 11, 253, 49, 33, 23})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetTime(0, time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC))
+			r.SetTime(0, time.Date(2022, 10, 25, 3, 25, 0, 0, time.UTC))
+
+			checkRecordLength(t, r, 14)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 120, 231, 11, 253, 49, 33, 23})
+		},
+	)
+}
+
+func TestRecord_SetString(t *testing.T) {
+	t.Run(
+		"check empty string", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "")
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 17)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 3,
-					byte(INTEGER),
-					0, 0, 0, 1,
-					0, 0, 0, 2,
-					0, 0, 0, 3,
-				},
+
+			checkRecordLength(t, r, 8)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0})
+		},
+	)
+
+	t.Run(
+		"check two elements", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetString(1, "world")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 22)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 15, 0})
+			checkRecordBytes(t, r, 8, []byte{5, 0, 104, 101, 108, 108, 111})
+			checkRecordBytes(t, r, 15, []byte{5, 0, 119, 111, 114, 108, 100})
+		},
+	)
+
+	t.Run(
+		"check string with null character", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "hello\x00world")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 19)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(
+				t, r, 6, []byte{11, 0, 104, 101, 108, 108, 111, 0, 119, 111, 114, 108, 100},
 			)
 		},
 	)
 
 	t.Run(
-		"check long array append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(Array{LONG, []any{int64(1), int64(2), int64(3)}})
+		"check emoji", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "😀")
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 29)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 3,
-					byte(LONG),
-					0, 0, 0, 0, 0, 0, 0, 1,
-					0, 0, 0, 0, 0, 0, 0, 2,
-					0, 0, 0, 0, 0, 0, 0, 3,
-				},
-			)
+
+			checkRecordLength(t, r, 12)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{4, 0, 240, 159, 152, 128})
 		},
 	)
 
 	t.Run(
-		"check float array append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(Array{FLOAT, []any{float32(1), float32(2), float32(3)}})
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "hello")
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 17)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 3,
-					byte(FLOAT),
-					63, 128, 0, 0,
-					64, 0, 0, 0,
-					64, 64, 0, 0,
-				},
-			)
+			err = r.SetString(0, "world")
+			if err != nil {
+				t.Error(err)
+			}
+			checkRecordLength(t, r, 13)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{5, 0, 119, 111, 114, 108, 100})
 		},
 	)
 
 	t.Run(
-		"check double array append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(Array{DOUBLE, []any{float64(1), float64(2), float64(3)}})
+		"check write overflows", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetString(0, "hello")
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 29)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 3,
-					byte(DOUBLE),
-					63, 240, 0, 0, 0, 0, 0, 0,
-					64, 0, 0, 0, 0, 0, 0, 0,
-					64, 8, 0, 0, 0, 0, 0, 0,
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check bool array append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(Array{BOOLEAN, []any{true, false, true}})
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 8)
-			checkBytes(t, r, 0, []byte{0, 0, 0, 3, byte(BOOLEAN), 1, 0, 1})
-		},
-	)
-
-	t.Run(
-		"check string array append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(Array{STRING, []any{"hello", "world"}})
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 23)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 2,
-					byte(STRING),
-					0, 0, 0, 5,
-					104, 101, 108, 108, 111,
-					0, 0, 0, 5,
-					119, 111, 114, 108, 100,
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check time array append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(
-				Array{
-					TIME,
-					[]any{
-						time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-						time.Date(2022, 10, 25, 0, 0, 0, 0, time.UTC),
-					},
-				},
-			)
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 21)
-			checkBytes(
-				t, r, 0, []byte{
-					0, 0, 0, 2,
-					byte(TIME),
-					0, 0, 0, 0, 0, 0, 0, 0,
-					23, 33, 38, 205, 58, 198, 0, 0,
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check array append with invalid type", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeArray(Array{STRING, []any{1, 2, 3}})
+			err = r.SetString(0, "world!")
 			if err == nil {
-				t.Error("expected error when appending array with invalid type")
+				t.Error("expected error when writing over a shorter string")
 			}
 		},
 	)
 }
 
-func TestRecord_SerializeMap(t *testing.T) {
-	t.Parallel()
-
+func TestRecord_SetArray(t *testing.T) {
 	t.Run(
-		"check int:int map append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeMap(
-				Map{INTEGER, INTEGER, map[any]any{1: 2, 3: 4}},
-			)
+		"check empty array", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{}})
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 22)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(INTEGER), byte(INTEGER),
-						0, 0, 0, 1,
-						0, 0, 0, 2,
-						0, 0, 0, 3,
-						0, 0, 0, 4,
-					},
-					{
-						0, 0, 0, 2,
-						byte(INTEGER), byte(INTEGER),
-						0, 0, 0, 3,
-						0, 0, 0, 4,
-						0, 0, 0, 1,
-						0, 0, 0, 2,
-					},
-				},
-			)
+
+			checkRecordLength(t, r, 9)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, byte(INT32)})
 		},
 	)
 
 	t.Run(
-		"check long:long map append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeMap(
-				Map{
-					LONG, LONG,
-					map[any]any{
-						int64(1): int64(2),
-						int64(3): int64(4),
-					},
-				},
-			)
+		"check array with one element", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1}})
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 38)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(LONG), byte(LONG),
-						0, 0, 0, 0, 0, 0, 0, 1,
-						0, 0, 0, 0, 0, 0, 0, 2,
-						0, 0, 0, 0, 0, 0, 0, 3,
-						0, 0, 0, 0, 0, 0, 0, 4,
-					},
-					{
-						0, 0, 0, 2,
-						byte(LONG), byte(LONG),
-						0, 0, 0, 0, 0, 0, 0, 3,
-						0, 0, 0, 0, 0, 0, 0, 4,
-						0, 0, 0, 0, 0, 0, 0, 1,
-						0, 0, 0, 0, 0, 0, 0, 2,
-					},
-				},
-			)
+
+			checkRecordLength(t, r, 13)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{1, 0, byte(INT32), 1, 0, 0, 0})
 		},
 	)
 
 	t.Run(
-		"check float:float map append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeMap(
-				Map{
-					FLOAT, FLOAT,
-					map[any]any{
-						float32(1.0): float32(2.0),
-						float32(3.0): float32(4.0),
-					},
-				},
-			)
+		"check array with two elements", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
 			if err != nil {
 				t.Error(err)
 			}
-			checkLength(t, r, 22)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(FLOAT), byte(FLOAT),
-						63, 128, 0, 0,
-						64, 0, 0, 0,
-						64, 64, 0, 0,
-						64, 128, 0, 0,
-					},
-					{
-						0, 0, 0, 2,
-						byte(FLOAT), byte(FLOAT),
-						64, 64, 0, 0,
-						64, 128, 0, 0,
-						63, 128, 0, 0,
-						64, 0, 0, 0,
-					},
-				},
-			)
+
+			checkRecordLength(t, r, 17)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
 		},
 	)
 
 	t.Run(
-		"check double:double  map append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeMap(Map{DOUBLE, DOUBLE, map[any]any{1.0: 2.0, 3.0: 4.0}})
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 38)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(DOUBLE), byte(DOUBLE),
-						63, 240, 0, 0, 0, 0, 0, 0,
-						64, 0, 0, 0, 0, 0, 0, 0,
-						64, 8, 0, 0, 0, 0, 0, 0,
-						64, 16, 0, 0, 0, 0, 0, 0,
-					},
-					{
-						0, 0, 0, 2,
-						byte(DOUBLE), byte(DOUBLE),
-						64, 8, 0, 0, 0, 0, 0, 0,
-						64, 16, 0, 0, 0, 0, 0, 0,
-						63, 240, 0, 0, 0, 0, 0, 0,
-						64, 0, 0, 0, 0, 0, 0, 0,
-					},
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check bool:bool map append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeMap(
-				Map{
-					BOOLEAN, BOOLEAN,
-					map[any]any{
-						true:  false,
-						false: true,
-					},
-				},
-			)
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 10)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(BOOLEAN), byte(BOOLEAN),
-						1, 0,
-						0, 1,
-					},
-					{
-						0, 0, 0, 2,
-						byte(BOOLEAN), byte(BOOLEAN),
-						0, 1,
-						1, 0,
-					},
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check string:string map append", func(t *testing.T) {
-			r := Record{}
-
-			err := r.SerializeMap(
-				Map{
-					STRING, STRING,
-					map[any]any{
-						"hello": "world",
-						"foo":   "bar",
-					},
-				},
-			)
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 38)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(STRING), byte(STRING),
-						0, 0, 0, 5,
-						104, 101, 108, 108, 111,
-						0, 0, 0, 5,
-						119, 111, 114, 108, 100,
-						0, 0, 0, 3,
-						102, 111, 111,
-						0, 0, 0, 3,
-						98, 97, 114,
-					},
-					{
-						0, 0, 0, 2,
-						byte(STRING), byte(STRING),
-						0, 0, 0, 3,
-						102, 111, 111,
-						0, 0, 0, 3,
-						98, 97, 114,
-						0, 0, 0, 5,
-						104, 101, 108, 108, 111,
-						0, 0, 0, 5,
-						119, 111, 114, 108, 100,
-					},
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check int:string map append", func(t *testing.T) {
-			r := Record{}
-			err := r.SerializeMap(Map{INTEGER, STRING, map[any]any{1: "foo", 2: ""}})
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 25)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(INTEGER), byte(STRING),
-						0, 0, 0, 1,
-						0, 0, 0, 3,
-						102, 111, 111,
-						0, 0, 0, 2,
-						0, 0, 0, 0,
-					},
-					{
-						0, 0, 0, 2,
-						byte(INTEGER), byte(STRING),
-						0, 0, 0, 2,
-						0, 0, 0, 0,
-						0, 0, 0, 1,
-						0, 0, 0, 3,
-						102, 111, 111,
-					},
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check string:array map append", func(t *testing.T) {
-			r := Record{}
-			err := r.SerializeMap(
-				Map{
-					STRING, ARRAY,
-					map[any]any{
-						"foo": Array{INTEGER, []any{1, 2, 3}},
-						"bar": Array{INTEGER, []any{-1, -2}},
-					},
-				},
-			)
-			if err != nil {
-				t.Error(err)
-			}
-			checkLength(t, r, 50)
-			checkBytesOneOf(
-				t, r, 0, [][]byte{
-					{
-						0, 0, 0, 2,
-						byte(STRING), byte(ARRAY),
-
-						0, 0, 0, 3,
-						102, 111, 111,
-						0, 0, 0, 3,
-						byte(INTEGER),
-						0, 0, 0, 1,
-						0, 0, 0, 2,
-						0, 0, 0, 3,
-
-						0, 0, 0, 3,
-						98, 97, 114,
-						0, 0, 0, 2,
-						byte(INTEGER),
-						255, 255, 255, 255,
-						255, 255, 255, 254,
-					},
-					{
-						0, 0, 0, 2,
-						byte(STRING), byte(ARRAY),
-
-						0, 0, 0, 3,
-						98, 97, 114,
-						0, 0, 0, 2,
-						byte(INTEGER),
-						255, 255, 255, 255,
-						255, 255, 255, 254,
-
-						0, 0, 0, 3,
-						102, 111, 111,
-						0, 0, 0, 3,
-						byte(INTEGER),
-						0, 0, 0, 1,
-						0, 0, 0, 2,
-						0, 0, 0, 3,
-					},
-				},
-			)
-		},
-	)
-
-	t.Run(
-		"check string:map map append", func(t *testing.T) {
-			r := Record{}
-			err := r.SerializeMap(Map{STRING, MAP, map[any]any{"foo": map[any]any{"bar": 1}}})
+		"check array with two elements of different types", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, "hello"}})
 			if err == nil {
-				t.Error("error expected when serializing maps as values in maps")
+				t.Error("expected error when setting array with different types")
 			}
 		},
 	)
 
 	t.Run(
-		"check invalid key type", func(t *testing.T) {
-			r := Record{}
-			err := r.SerializeMap(Map{INTEGER, STRING, map[any]any{1.0: "foo"}})
+		"check two arrays", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(1, Array{INT32, []any{3, 4}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 30)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 19, 0})
+			checkRecordBytes(t, r, 8, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 19, []byte{2, 0, byte(INT32), 3, 0, 0, 0, 4, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check element update", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(0, Array{INT32, []any{3, 4}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 17)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(INT32), 3, 0, 0, 0, 4, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check write overflows", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(0, Array{INT32, []any{3, 4, 5}})
 			if err == nil {
-				t.Error("error expected when serializing map with invalid key type")
+				t.Error("expected error when writing over a shorter array")
 			}
 		},
 	)
 
 	t.Run(
-		"check invalid value type", func(t *testing.T) {
-			r := Record{}
-			err := r.SerializeMap(Map{INTEGER, STRING, map[any]any{1: 1}})
+		"check array followed by string", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetArray(0, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetString(1, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 26)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 19, 0})
+			checkRecordBytes(t, r, 8, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 19, []byte{5, 0, 104, 101, 108, 108, 111})
+		},
+	)
+
+	t.Run(
+		"check string followed by array", func(t *testing.T) {
+			r := NewRecord(2)
+			err := r.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r.SetArray(1, Array{INT32, []any{1, 2}})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 26)
+			checkRecordBytes(t, r, 4, []byte{8, 0, 15, 0})
+			checkRecordBytes(t, r, 8, []byte{5, 0, 104, 101, 108, 108, 111})
+			checkRecordBytes(t, r, 15, []byte{2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0})
+		},
+	)
+
+	t.Run(
+		"check array with array element", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{ARRAY, []any{Array{INT32, []any{1, 2}}}})
 			if err == nil {
-				t.Error("error expected when serializing map with invalid value type")
+				t.Error("expected error when setting array with array elements")
 			}
+		},
+	)
+
+	t.Run(
+		"check array with nil value", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetArray(0, Array{INT32, nil})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 6)
+			checkRecordBytes(t, r, 4, []byte{0, 0})
 		},
 	)
 }
 
-func TestRecord_DeserializeInt(t *testing.T) {
-	t.Parallel()
-
+func TestRecord_SetMap(t *testing.T) {
 	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-
-			for i := 0; i < 3; i++ {
-				r.SerializeInt(i * 10)
-			}
-
-			var offset RecordOffset
-			for i := 0; i < 3; i++ {
-				got, newOffset := r.DeserializeInt(offset)
-				want := i * 10
-				if got != want {
-					t.Errorf("expected %d, got %d", want, got)
-				}
-				offset = newOffset
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeLong(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-
-			for i := 0; i < 3; i++ {
-				r.SerializeLong(int64(i * 10))
-			}
-
-			var offset RecordOffset
-			for i := 0; i < 3; i++ {
-				got, newOffset := r.DeserializeLong(offset)
-				want := int64(i) * 10
-				if got != want {
-					t.Errorf("expected %d, got %d", want, got)
-				}
-				offset = newOffset
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeFloat(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-
-			for i := 0; i < 3; i++ {
-				r.SerializeFloat(float32(i) * 3.14)
-			}
-
-			var offset RecordOffset
-			for i := 0; i < 3; i++ {
-				got, newOffset := r.DeserializeFloat(offset)
-				want := float32(i) * 3.14
-				if got != want {
-					t.Errorf("expected %f, got %f", want, got)
-				}
-				offset = newOffset
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeDouble(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-
-			for i := 0; i < 3; i++ {
-				r.SerializeDouble(float64(i) * 3.14)
-			}
-
-			var offset RecordOffset
-			for i := 0; i < 3; i++ {
-				got, newOffset := r.DeserializeDouble(offset)
-				want := float64(i) * 3.14
-				if got != want {
-					t.Errorf("expected %f, got %f", want, got)
-				}
-				offset = newOffset
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeBool(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-
-			for i := 0; i < 3; i++ {
-				r.SerializeBool(i%2 == 0)
-			}
-
-			var offset RecordOffset
-			for i := 0; i < 3; i++ {
-				got, newOffset := r.DeserializeBool(offset)
-				want := i%2 == 0
-				if got != want {
-					t.Errorf("expected %t, got %t", want, got)
-				}
-				offset = newOffset
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeString(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			want := "concurrency"
-			r.SerializeString(want)
-			got, newOffset := r.DeserializeString(offset)
-			offset = newOffset
-			if got != want {
-				t.Errorf("expected %s, got %s", want, got)
-			}
-
-			want = "is"
-			r.SerializeString(want)
-			got, newOffset = r.DeserializeString(offset)
-			offset = newOffset
-			if got != want {
-				t.Errorf("expected %s, got %s", want, got)
-			}
-
-			want = "not parallelism"
-			r.SerializeString(want)
-			got, newOffset = r.DeserializeString(offset)
-			offset = newOffset
-			if got != want {
-				t.Errorf("expected %s, got %s", want, got)
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeTime(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check three reads", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			want := time.Now().AddDate(1, 0, 0)
-			r.SerializeTime(want)
-			got, newOffset := r.DeserializeTime(offset)
-			offset = newOffset
-			if got != want {
-				t.Errorf("expected %s, got %s", want, got)
-			}
-
-			want = time.Now().AddDate(0, 1, 1)
-			r.SerializeTime(want)
-			got, newOffset = r.DeserializeTime(offset)
-			offset = newOffset
-			if got != want {
-				t.Errorf("expected %s, got %s", want, got)
-			}
-
-			want = time.Now().AddDate(0, 0, -1)
-			r.SerializeTime(want)
-			got, newOffset = r.DeserializeTime(offset)
-			offset = newOffset
-			if got != want {
-				t.Errorf("expected %s, got %s", want, got)
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeArray(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check empty array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{INTEGER, []any{}})
+		"check empty map", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{INT32, INT32, map[any]any{}})
 			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
+				t.Error(err)
 			}
 
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 0 {
-				t.Errorf("expected empty array, got %v", got)
-			}
-			if newOffset != offset+5 {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 5, got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != INTEGER {
-				t.Errorf(
-					"expected element type to be %b (integer), got %b", INTEGER, got.ElementType,
-				)
-			}
+			checkRecordLength(t, r, 10)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{0, 0, byte(INT32), byte(INT32)})
 		},
 	)
 
 	t.Run(
-		"check integer array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{INTEGER, []any{1, 2, 3}})
+		"check map with one element", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{INT32, INT32, map[any]any{1: 2}})
 			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
+				t.Error(err)
 			}
 
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 3 {
-				t.Errorf("expected array of length 3, got %v", got)
-			}
-			if newOffset != offset+17 {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 14, got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != INTEGER {
-				t.Errorf(
-					"expected element type to be %b (integer), got %b", INTEGER, got.ElementType,
-				)
-			}
+			checkRecordLength(t, r, 18)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(
+				t, r, 6, []byte{1, 0, byte(INT32), byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0},
+			)
 		},
 	)
 
 	t.Run(
-		"check long array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{LONG, []any{int64(1), int64(2), int64(3)}})
+		"check map with two key-value pairs", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{INT32, INT32, map[any]any{1: 2, 3: 4}})
 			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
+				t.Error(err)
 			}
 
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 3 {
-				t.Errorf("expected array of length 3, got %v", got)
-			}
-			if newOffset != offset+29 {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 22, got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != LONG {
-				t.Errorf(
-					"expected element type to be %b (long), got %b", LONG, got.ElementType,
-				)
-			}
-		},
-	)
-
-	t.Run(
-		"check float array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{FLOAT, []any{float32(1.0), float32(2.0), float32(3.0)}})
-			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
-			}
-
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 3 {
-				t.Errorf("expected array of length 3, got %v", got)
-			}
-			if newOffset != offset+17 {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 14, got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != FLOAT {
-				t.Errorf(
-					"expected element type to be %b (float), got %b", FLOAT, got.ElementType,
-				)
-			}
-		},
-	)
-
-	t.Run(
-		"check double array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{DOUBLE, []any{1.0, 2.0, 3.0}})
-			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
-			}
-
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 3 {
-				t.Errorf("expected array of length 3, got %v", got)
-			}
-			if newOffset != offset+29 {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 22, got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != DOUBLE {
-				t.Errorf(
-					"expected element type to be %b (double), got %b", DOUBLE, got.ElementType,
-				)
-			}
-		},
-	)
-
-	t.Run(
-		"check string array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{STRING, []any{"hello", "world"}})
-			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
-			}
-
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 2 {
-				t.Errorf("expected array of length 2, got %v", got)
-			}
-			if newOffset != offset+5+2*(4+5) {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 5 + (2 * (4 + 5)), got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != STRING {
-				t.Errorf(
-					"expected element type to be %b (string), got %b", STRING, got.ElementType,
-				)
-			}
-			if got.Values[0] != "hello" {
-				t.Errorf("expected first element to be 'hello', got %s", got.Values[0])
-			}
-			if got.Values[1] != "world" {
-				t.Errorf("expected second element to be 'world', got %s", got.Values[1])
-			}
-		},
-	)
-
-	t.Run(
-		"check time array read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeArray(Array{TIME, []any{time.Now(), time.Now().AddDate(0, 0, 1)}})
-			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
-			}
-
-			got, newOffset, err := r.DeserializeArray(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Values) != 2 {
-				t.Errorf("expected array of length 2, got %v", got)
-			}
-			if newOffset != offset+5+2*8 {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by 5 + (2 * 8), got %d",
-					offset,
-					newOffset,
-				)
-			}
-			if got.ElementType != TIME {
-				t.Errorf(
-					"expected element type to be %b (time), got %b", TIME, got.ElementType,
-				)
-			}
-		},
-	)
-}
-
-func TestRecord_DeserializeMap(t *testing.T) {
-	t.Parallel()
-
-	t.Run(
-		"check empty map read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeMap(Map{INTEGER, STRING, map[any]any{}})
-			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
-			}
-
-			got, gotOffset, err := r.DeserializeMap(offset)
-			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
-			}
-
-			if len(got.Data) != 0 {
-				t.Errorf("expected map with 0 elements, got %v", got)
-			}
-
-			wantOffset := offset + 6
-			if gotOffset != wantOffset {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by %d, got %d",
-					offset,
-					wantOffset,
-					gotOffset,
-				)
-			}
-
-			if got.KeyType != INTEGER {
-				t.Errorf(
-					"expected key type to be %b (int), got %b", INTEGER, got.KeyType,
-				)
-			}
-			if got.ValueType != STRING {
-				t.Errorf(
-					"expected value type to be %b (string), got %b", STRING, got.ValueType,
-				)
-			}
-		},
-	)
-
-	t.Run(
-		"check int:string map read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
-
-			err := r.SerializeMap(
-				Map{
-					INTEGER, STRING,
-					map[any]any{
-						1: "hello",
-						2: "world",
+			checkRecordLength(t, r, 26)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(INT32), byte(INT32)})
+			checkRecordBytesOneOf(
+				t, r, 10, [][]byte{
+					{
+						1, 0, 0, 0,
+						2, 0, 0, 0,
+						3, 0, 0, 0,
+						4, 0, 0, 0,
+					},
+					{
+						3, 0, 0, 0,
+						4, 0, 0, 0,
+						1, 0, 0, 0,
+						2, 0, 0, 0,
 					},
 				},
 			)
+		},
+	)
+
+	t.Run(
+		"check map with string keys", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, map[any]any{"a": 1, "b": 2}})
 			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
+				t.Error(err)
 			}
 
-			got, gotOffset, err := r.DeserializeMap(offset)
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, byte(STRING), byte(INT32)})
+			checkRecordBytesOneOf(
+				t, r, 10, [][]byte{
+					{
+						1, 0, 97,
+						1, 0, 0, 0,
+						1, 0, 98,
+						2, 0, 0, 0,
+					},
+					{
+						1, 0, 98,
+						2, 0, 0, 0,
+						1, 0, 97,
+						1, 0, 0, 0,
+					},
+				},
+			)
+		},
+	)
+
+	t.Run(
+		"check map with array values", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, ARRAY, map[any]any{"a": Array{INT32, []any{1, 2}}}})
 			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
+				t.Error(err)
 			}
 
-			if len(got.Data) != 2 {
-				t.Errorf("expected map with 2 elements, got %v", got)
-			}
+			checkRecordLength(t, r, 24)
+			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(
+				t, r, 6, []byte{
+					1, 0,
+					byte(STRING), byte(ARRAY),
+				},
+			)
+			checkRecordBytes(
+				t, r, 10, []byte{
+					1, 0, 97,
+					2, 0, byte(INT32), 1, 0, 0, 0, 2, 0, 0, 0,
+				},
+			)
+		},
+	)
 
-			wantOffset := offset + 6 + 2*(4+4+5)
-			if gotOffset != wantOffset {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by %d, got %d",
-					offset,
-					wantOffset,
-					gotOffset,
-				)
-			}
-
-			if got.KeyType != INTEGER {
-				t.Errorf(
-					"expected key type to be %b (int), got %b", INTEGER, got.KeyType,
-				)
-			}
-			if got.ValueType != STRING {
-				t.Errorf(
-					"expected value type to be %b (string), got %b", STRING, got.ValueType,
-				)
-			}
-
-			hello, ok := got.Data[1]
-			if !ok {
-				t.Errorf("expected key 1 to be present in map, got %v", got)
-			}
-			if hello != "hello" {
-				t.Errorf("expected first element to be 'hello', got %s", hello)
-			}
-
-			world, ok := got.Data[2]
-			if !ok {
-				t.Errorf("expected key 2 to be present in map, got %v", got)
-			}
-			if world != "world" {
-				t.Errorf("expected second element to be 'world', got %s", world)
+	t.Run(
+		"check map with map values", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(
+				0, Map{STRING, MAP, map[any]any{"a": Map{INT32, INT32, map[any]any{1: 2}}}},
+			)
+			if err == nil {
+				t.Error("expected error when setting map with map values")
 			}
 		},
 	)
 
 	t.Run(
-		"check string:array map read", func(t *testing.T) {
-			r := Record{}
-			var offset RecordOffset
+		"check map with different key types", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, map[any]any{"a": 1, 2: 3}})
+			if err == nil {
+				t.Error("expected error when setting map with different key types")
+			}
+		},
+	)
 
-			err := r.SerializeMap(
-				Map{
-					STRING, ARRAY,
-					map[any]any{
-						"hello": Array{STRING, []any{"world", "foo", "bar"}},
-						"world": Array{STRING, []any{"hello", "foo", "bar"}},
-					},
+	t.Run(
+		"check map with different value types", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, map[any]any{"a": 1, "b": "c"}})
+			if err == nil {
+				t.Error("expected error when setting map with different value types")
+			}
+		},
+	)
+
+	t.Run(
+		"check map with nil value", func(t *testing.T) {
+			r := NewRecord(1)
+			err := r.SetMap(0, Map{STRING, INT32, nil})
+			if err != nil {
+				t.Error(err)
+			}
+
+			checkRecordLength(t, r, 6)
+			checkRecordBytes(t, r, 4, []byte{0, 0})
+		},
+	)
+}
+
+func TestRecord_GetUint32(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := uint32(10)
+			r.SetUint32(0, want)
+			isNull, got := r.GetUint32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := uint32(10)
+			r.SetUint32(0, want)
+			isNull, got := r.GetUint32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = uint32(20)
+			r.SetUint32(1, want)
+			isNull, got = r.GetUint32(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetUint64(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := uint64(10)
+			r.SetUint64(0, want)
+			isNull, got := r.GetUint64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := uint64(10)
+			r.SetUint64(0, want)
+			isNull, got := r.GetUint64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = uint64(20)
+			r.SetUint64(1, want)
+			isNull, got = r.GetUint64(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetInt32(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := int32(10)
+			r.SetInt32(0, want)
+			isNull, got := r.GetInt32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := int32(10)
+			r.SetInt32(0, want)
+			isNull, got := r.GetInt32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = int32(20)
+			r.SetInt32(1, want)
+			isNull, got = r.GetInt32(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetInt64(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := int64(10)
+			r.SetInt64(0, want)
+			isNull, got := r.GetInt64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := int64(10)
+			r.SetInt64(0, want)
+			isNull, got := r.GetInt64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+
+			want = int64(20)
+			r.SetInt64(1, want)
+			isNull, got = r.GetInt64(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetFloat32(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := float32(10.01)
+			r.SetFloat32(0, want)
+			isNull, got := r.GetFloat32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := float32(10.01)
+			r.SetFloat32(0, want)
+			isNull, got := r.GetFloat32(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+
+			want = float32(20.02)
+			r.SetFloat32(1, want)
+			isNull, got = r.GetFloat32(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetFloat64(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := 10.01
+			r.SetFloat64(0, want)
+			isNull, got := r.GetFloat64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := 10.01
+			r.SetFloat64(0, want)
+			isNull, got := r.GetFloat64(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+
+			want = 20.02
+			r.SetFloat64(1, want)
+			isNull, got = r.GetFloat64(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %f, want %f", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetBool(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			r.SetBool(0, true)
+			isNull, got := r.GetBool(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != true {
+				t.Errorf("got %t, want %t", got, true)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			r.SetBool(0, true)
+			isNull, got := r.GetBool(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != true {
+				t.Errorf("got %t, want %t", got, true)
+			}
+
+			r.SetBool(1, false)
+			isNull, got = r.GetBool(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != false {
+				t.Errorf("got %t, want %t", got, false)
+			}
+		},
+	)
+}
+
+func TestRecord_GetTime(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := time.Now().AddDate(0, 0, 1)
+			r.SetTime(0, want)
+			isNull, got := r.GetTime(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := time.Now().AddDate(0, 0, 1)
+			r.SetTime(0, want)
+			isNull, got := r.GetTime(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = time.Now().AddDate(0, 0, 2)
+			r.SetTime(1, want)
+			isNull, got = r.GetTime(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetString(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "hello"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := "hello"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = "world"
+			err = r.SetString(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got = r.GetString(1)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check empty string", func(t *testing.T) {
+			r := NewRecord(1)
+			want := ""
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check string with null byte", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "hello\x00world"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check emoji", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "👍"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check get after update", func(t *testing.T) {
+			r := NewRecord(1)
+			want := "hello"
+			err := r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got := r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = "guys"
+			err = r.SetString(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got = r.GetString(0)
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if got != want {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+}
+
+func TestRecord_GetArray(t *testing.T) {
+	t.Run(
+		"check basic get", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Array{STRING, []any{"foo", "bar"}}
+			err = r.SetArray(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetArray(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check empty array", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check array with null byte", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{"hello\x00world", "foo\x00bar"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check get after update", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Array{STRING, []any{"foo", "bar"}}
+			err = r.SetArray(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check first array is null but second is not", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Array{STRING, []any{"hello", "world"}}
+			err := r.SetArray(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetArray(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			isNull, got, err = r.GetArray(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if !isNull {
+				t.Errorf("expected null value, but got %v", got)
+			}
+		},
+	)
+}
+
+func TestRecord_GetMap(t *testing.T) {
+	t.Run(
+		"check single field", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check two fields", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Map{STRING, STRING, map[any]any{"foo": "bar"}}
+			err = r.SetMap(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetMap(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check empty map", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{STRING, STRING, map[any]any{}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check get after update", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			want = Map{STRING, STRING, map[any]any{"foo": "bar"}}
+			err = r.SetMap(0, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err = r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+		},
+	)
+
+	t.Run(
+		"check first map is null but second is not", func(t *testing.T) {
+			r := NewRecord(2)
+			want := Map{STRING, STRING, map[any]any{"hello": "world"}}
+			err := r.SetMap(1, want)
+			if err != nil {
+				t.Error(err)
+			}
+			isNull, got, err := r.GetMap(1)
+			if err != nil {
+				t.Error(err)
+			}
+			if isNull {
+				t.Error("expected non-null value")
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
+			}
+
+			isNull, got, err = r.GetMap(0)
+			if err != nil {
+				t.Error(err)
+			}
+			if !isNull {
+				t.Errorf("expected null value, but got %v", got)
+			}
+		},
+	)
+
+	t.Run(
+		"check map with array values", func(t *testing.T) {
+			r := NewRecord(1)
+			want := Map{
+				STRING,
+				ARRAY,
+				map[any]any{
+					"hello": Array{STRING, []any{"world", "foo", "bar"}},
 				},
-			)
+			}
+			err := r.SetMap(0, want)
 			if err != nil {
-				t.Errorf("expected no error while serialzing, got %s", err)
+				t.Error(err)
 			}
-
-			got, gotOffset, err := r.DeserializeMap(offset)
+			isNull, got, err := r.GetMap(0)
 			if err != nil {
-				t.Errorf("expected no error while deserializing, got %s", err)
+				t.Error(err)
 			}
-
-			if len(got.Data) != 2 {
-				t.Errorf("expected map with 2 elements, got %v", got)
+			if isNull {
+				t.Error("expected non-null value")
 			}
-
-			wantOffset := offset + 6 + 2*(4+5+4+1+4+5+2*(4+3))
-			if gotOffset != wantOffset {
-				t.Errorf(
-					"expected offsetForPosition (%d) to be incremented by %d, got %d",
-					offset,
-					wantOffset,
-					gotOffset,
-				)
-			}
-
-			if got.KeyType != STRING {
-				t.Errorf(
-					"expected key type to be %b (string), got %b", STRING, got.KeyType,
-				)
-			}
-			if got.ValueType != ARRAY {
-				t.Errorf(
-					"expected value type to be %b (array), got %b", ARRAY, got.ValueType,
-				)
-			}
-
-			world, ok := got.Data["hello"]
-			if !ok {
-				t.Errorf("expected key 'hello' to be present in map, got %v", got)
-			}
-			wantArray := []any{"world", "foo", "bar"}
-			for i, v := range world.(Array).Values {
-				if v != wantArray[i] {
-					t.Errorf("expected element at index %d to be %s, got %s", i, wantArray[i], v)
-				}
-			}
-
-			hello, ok := got.Data["world"]
-			if !ok {
-				t.Errorf("expected key 'world' to be present in map, got %v", got)
-			}
-			wantArray = []any{"hello", "foo", "bar"}
-			for i, v := range hello.(Array).Values {
-				if v != wantArray[i] {
-					t.Errorf("expected element at index %d to be %s, got %s", i, wantArray[i], v)
-				}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("got %v, want %v", got, want)
 			}
 		},
 	)

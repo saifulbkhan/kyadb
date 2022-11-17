@@ -1,415 +1,836 @@
 package storage
 
 import (
-	"errors"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"time"
 )
 
-//
 const (
-	INTEGER ElementType = 'i'
-	LONG    ElementType = 'l'
-	FLOAT   ElementType = 'f'
-	DOUBLE  ElementType = 'd'
-	BOOLEAN ElementType = 'b'
-	// 	STRING  ElementType = 's'
-	// 	TIME    ElementType = 't'
-	// 	ARRAY   ElementType = 'a'
-	// 	MAP     ElementType = 'm'
+	NULL    ElementType = '\x00'
+	UINT32  ElementType = 'u'
+	UINT64  ElementType = 'v'
+	INT32   ElementType = 'i'
+	INT64   ElementType = 'l'
+	FLOAT32 ElementType = 'f'
+	FLOAT64 ElementType = 'd'
+	BOOL    ElementType = 'b'
+	STRING  ElementType = 's'
+	TIME    ElementType = 't'
+	ARRAY   ElementType = 'a'
+	MAP     ElementType = 'm'
 )
 
-//
-// type Record []byte
-type RecordOffset int16
+type Record []byte
+type ElementPosition uint16
+type ElementType byte
 
-// type ElementType byte
-//
-// type Array struct {
-// 	ElementType ElementType
-// 	Values      []any
-// }
-//
-// type Map struct {
-// 	KeyType   ElementType
-// 	ValueType ElementType
-// 	Data      map[any]any
-// }
+type Array struct {
+	ElementType ElementType
+	Values      []any
+}
 
-// -------------------------------------------------------------------------------------------------
-// QUESTION - how do you update a record? You can't just append to the end of the record, you need
-// to update the offsets of all the other records. So you need to be able to update the record in
-// place. This is a problem for the string, map and array types, because they have variable length.
-// -------------------------------------------------------------------------------------------------
+type Map struct {
+	KeyType   ElementType
+	ValueType ElementType
+	Data      map[any]any
+}
 
-// -------------------------------------------------------------------------------------------------
-// Algorithm for storing null values:
-// 1. Use a function to set a null at a given offsetForPosition (also takes in an element type):
-//    - This function will set the bit for the latest element in bitmap to 1.
-//    - This function however will also store a default value for the element at given byte offsetForPosition,
-//      only if the element type is not a variable-length element like string, array, or map.
-// 2. Use a function to check if a value for a given column ID is null
-//    - This function will just check if the bit at the given column ID (number) is set to 1 in the
-//      bitmap.
-// -------------------------------------------------------------------------------------------------
+// WriteOverflowError is returned when there is not enough space in the record to write the given
+// Data.
+type WriteOverflowError struct {
+	availableBytes uint16
+	requiredBytes  uint16
+	data           any
+}
 
-func ElementTypeOfValue(val any) (ElementType, error) {
-	var elementType ElementType
-	var err error
-	switch val.(type) {
-	case int:
-		elementType = INTEGER
-	case int64:
-		elementType = LONG
-	case float32:
-		elementType = FLOAT
-	case float64:
-		elementType = DOUBLE
-	case bool:
-		elementType = BOOLEAN
-	case string:
-		elementType = STRING
-	case time.Time:
-		elementType = TIME
-	case Array:
-		elementType = ARRAY
-	case Map:
-		elementType = MAP
-	default:
-		err = fmt.Errorf("unsupported type %T", val)
+// TypeMismatchError is returned when the type of the user-provided value does not match the type
+// of the element expected at a position.
+type TypeMismatchError struct {
+	expected ElementType
+	actual   ElementType
+}
+
+// UnrecognizedTypeError is returned when the type of the user-provided value is not recognized.
+type UnrecognizedTypeError struct {
+	value any
+}
+
+// InvalidElementTypeError is returned when user tries to create an Array with an unsupported
+// element type.
+type InvalidElementTypeError struct {
+	elemType ElementType
+}
+
+// InvalidKeyTypeError is returned when user tries to create a Map with an unsupported key type.
+type InvalidKeyTypeError struct {
+	keyType ElementType
+}
+
+// InvalidValueTypeError is returned when user tries to create a Map with an unsupported value type.
+type InvalidValueTypeError struct {
+	valueType ElementType
+}
+
+func (e *WriteOverflowError) Error() string {
+	return fmt.Sprintf("not enough space to write %v bytes for %v", e.requiredBytes, e.data)
+}
+
+func (e *TypeMismatchError) Error() string {
+	expectedTypeName, err := nameForElementType(e.expected)
+	if err != nil {
+		return err.Error()
 	}
-	return elementType, err
-}
-
-func typeNameOfValue(val any) (string, error) {
-	var valType string
-	var err error
-	switch val.(type) {
-	case int:
-		valType = "int"
-	case int64:
-		valType = "int64"
-	case float32:
-		valType = "float32"
-	case float64:
-		valType = "float64"
-	case bool:
-		valType = "bool"
-	case string:
-		valType = "string"
-	case time.Time:
-		valType = "time.Time"
-	case Array:
-		valType = "array"
-	default:
-		err = fmt.Errorf("unsupported type %T", val)
+	actualTypeName, err := nameForElementType(e.actual)
+	if err != nil {
+		return err.Error()
 	}
-	return valType, err
+	return fmt.Sprintf("expected type '%s', got '%s'", expectedTypeName, actualTypeName)
 }
 
-func (r *Record) SerializeInt(val int) {
-	*r = append(*r, byte(val>>24), byte(val>>16), byte(val>>8), byte(val))
+func (e *UnrecognizedTypeError) Error() string {
+	return fmt.Sprintf("unrecognized type %T", e.value)
 }
 
-func (r *Record) SerializeLong(val int64) {
-	*r = append(
-		*r,
-		byte(val>>56),
-		byte(val>>48),
-		byte(val>>40),
-		byte(val>>32),
-		byte(val>>24),
-		byte(val>>16),
-		byte(val>>8),
-		byte(val),
-	)
+func (e *InvalidElementTypeError) Error() string {
+	elemTypeName, err := nameForElementType(e.elemType)
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("invalid array element type '%s'", elemTypeName)
 }
 
-func (r *Record) SerializeFloat(val float32) {
-	r.SerializeInt(int(math.Float32bits(val)))
+func (e *InvalidKeyTypeError) Error() string {
+	keyTypeName, err := nameForElementType(e.keyType)
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("invalid map key type '%s'", keyTypeName)
 }
 
-func (r *Record) SerializeDouble(val float64) {
-	r.SerializeLong(int64(math.Float64bits(val)))
+func (e *InvalidValueTypeError) Error() string {
+	valueTypeName, err := nameForElementType(e.valueType)
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("invalid map value type '%s'", valueTypeName)
 }
 
-func (r *Record) SerializeBool(val bool) {
-	if val {
-		*r = append(*r, byte(1))
+func nameForElementType(elemType ElementType) (string, error) {
+	var elemTypeName string
+	var err error
+	switch elemType {
+	case NULL:
+		elemTypeName = "null"
+	case UINT32:
+		elemTypeName = "uint32"
+	case UINT64:
+		elemTypeName = "uint64"
+	case INT32:
+		elemTypeName = "int32"
+	case INT64:
+		elemTypeName = "int64"
+	case FLOAT32:
+		elemTypeName = "float32"
+	case FLOAT64:
+		elemTypeName = "float64"
+	case BOOL:
+		elemTypeName = "bool"
+	case STRING:
+		elemTypeName = "string"
+	case TIME:
+		elemTypeName = "time"
+	case ARRAY:
+		elemTypeName = "array"
+	case MAP:
+		elemTypeName = "map"
+	default:
+		err = &UnrecognizedTypeError{elemType}
+	}
+	return elemTypeName, err
+}
+
+func bytesNeededForString(str string) uint16 {
+	return uint16(len(str)) + 2
+}
+
+func bytesNeededForPrimitive(value any) (uint16, error) {
+	var bytesNeeded uint16
+	var err error
+	switch value.(type) {
+	case bool:
+		bytesNeeded = 1
+	case uint, uint32, int, int32, float32:
+		bytesNeeded = 4
+	case uint64, int64, float64, time.Time:
+		bytesNeeded = 8
+	case string:
+		bytesNeeded = bytesNeededForString(value.(string))
+	default:
+		err = fmt.Errorf("unsupported primitive type %T", value)
+	}
+	return bytesNeeded, err
+}
+
+func bytesNeededForArray(a Array) (uint16, error) {
+	var bytesNeeded uint16
+	var err error
+	for _, value := range a.Values {
+		bytesNeededForElement, err := bytesNeededForPrimitive(value)
+		if err != nil {
+			break
+		}
+		bytesNeeded += bytesNeededForElement
+	}
+	return bytesNeeded + 3, err
+}
+
+func bytesNeededForMap(m Map) (uint16, error) {
+	var bytesNeeded uint16
+	var err error
+	for key, value := range m.Data {
+		bytesNeededForKey, err := bytesNeededForPrimitive(key)
+		if err != nil {
+			break
+		}
+		var bytesNeededForValue uint16
+		if m.ValueType == ARRAY {
+			bytesNeededForValue, err = bytesNeededForArray(value.(Array))
+		} else {
+			bytesNeededForValue, err = bytesNeededForPrimitive(value)
+		}
+		if err != nil {
+			break
+		}
+		bytesNeeded += bytesNeededForKey + bytesNeededForValue
+	}
+	return bytesNeeded + 4, err
+}
+
+func (r *Record) setLength(length uint16) {
+	binary.LittleEndian.PutUint16((*r)[0:2], length)
+}
+
+func (r *Record) setHeaderLength(headerLength uint16) {
+	binary.LittleEndian.PutUint16((*r)[2:4], headerLength)
+}
+
+func (r *Record) offsetForPosition(position ElementPosition) uint16 {
+	return binary.LittleEndian.Uint16((*r)[4+2*position : 6+2*position])
+}
+
+func (r *Record) setOffset(position ElementPosition, offset uint16) {
+	binary.LittleEndian.PutUint16((*r)[4+2*position:6+2*position], offset)
+}
+
+func (r *Record) writeUint32(offset uint16, value uint32) {
+	(*r)[offset] = byte(value)
+	(*r)[offset+1] = byte(value >> 8)
+	(*r)[offset+2] = byte(value >> 16)
+	(*r)[offset+3] = byte(value >> 24)
+}
+
+func (r *Record) writeUint64(offset uint16, value uint64) {
+	(*r)[offset] = byte(value)
+	(*r)[offset+1] = byte(value >> 8)
+	(*r)[offset+2] = byte(value >> 16)
+	(*r)[offset+3] = byte(value >> 24)
+	(*r)[offset+4] = byte(value >> 32)
+	(*r)[offset+5] = byte(value >> 40)
+	(*r)[offset+6] = byte(value >> 48)
+	(*r)[offset+7] = byte(value >> 56)
+}
+
+func (r *Record) writeBool(offset uint16, value bool) {
+	if value {
+		(*r)[offset] = 1
 	} else {
-		*r = append(*r, byte(0))
+		(*r)[offset] = 0
 	}
 }
 
-func (r *Record) SerializeString(str string) {
-	r.SerializeInt(len(str))
-	for _, val := range []byte(str) {
-		*r = append(*r, val)
-	}
+func (r *Record) writeString(offset uint16, value string) {
+	strLen := uint16(len(value))
+	(*r)[offset] = byte(strLen)
+	(*r)[offset+1] = byte(strLen >> 8)
+	copy((*r)[offset+2:offset+2+strLen], value)
 }
 
-func (r *Record) SerializeTime(val time.Time) {
-	r.SerializeLong(val.UnixNano())
-}
-
-func (r *Record) serializeAny(val any, expectedType ElementType) error {
-	checkValType := func(actualType ElementType) error {
-		if actualType != expectedType {
-			typeName, err := typeNameOfValue(val)
-			if err != nil {
-				return err
-			}
-			return fmt.Errorf("expected type '%s', got '%T'", typeName, val)
+func (r *Record) writePrimitive(offset uint16, value any, expectedType ElementType) (
+	uint16, error,
+) {
+	checkElementType := func(actualType ElementType) error {
+		if expectedType != actualType {
+			return &TypeMismatchError{expectedType, actualType}
 		}
 		return nil
 	}
 
-	switch val := val.(type) {
-	case int:
-		err := checkValType(INTEGER)
-		if err != nil {
-			return err
-		}
-		r.SerializeInt(val)
-	case int64:
-		err := checkValType(LONG)
-		if err != nil {
-			return err
-		}
-		r.SerializeLong(val)
-	case float32:
-		err := checkValType(FLOAT)
-		if err != nil {
-			return err
-		}
-		r.SerializeFloat(val)
-	case float64:
-		err := checkValType(DOUBLE)
-		if err != nil {
-			return err
-		}
-		r.SerializeDouble(val)
-	case bool:
-		err := checkValType(BOOLEAN)
-		if err != nil {
-			return err
-		}
-		r.SerializeBool(val)
-	case string:
-		err := checkValType(STRING)
-		if err != nil {
-			return err
-		}
-		r.SerializeString(val)
-	case time.Time:
-		err := checkValType(TIME)
-		if err != nil {
-			return err
-		}
-		r.SerializeTime(val)
-	case Array:
-		if len(val.Values) > 0 {
-			err := r.SerializeArray(val)
-			if err != nil {
-				return err
-			}
-		}
-	case []any:
-		return errors.New("regular arrays are not supported, wrap them in Array struct")
-	default:
-		return errors.New(fmt.Sprintf("unsupported type: %T", val))
-	}
-	return nil
-}
-
-func (r *Record) SerializeArray(data Array) error {
-	if data.ElementType == ARRAY {
-		return errors.New("arrays cannot be elements of an array")
-	}
-	if data.ElementType == MAP {
-		return errors.New("maps cannot be elements of an array")
-	}
-
-	r.SerializeInt(len(data.Values))
-	*r = append(*r, byte(data.ElementType))
-	if len(data.Values) > 0 {
-		for _, elem := range data.Values {
-			err := r.serializeAny(elem, data.ElementType)
-			if err != nil {
-				return fmt.Errorf("error serializing array: %w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (r *Record) SerializeMap(m Map) error {
-	if m.KeyType == ARRAY {
-		return errors.New("arrays cannot be keys of a map")
-	}
-	if m.KeyType == MAP {
-		return errors.New("maps cannot be keys of a map")
-	}
-	if m.ValueType == MAP {
-		return errors.New("maps cannot be values of a map")
-	}
-
-	r.SerializeInt(len(m.Data))
-	*r = append(*r, byte(m.KeyType), byte(m.ValueType))
-	if len(m.Data) > 0 {
-		for key, value := range m.Data {
-			err := r.serializeAny(key, m.KeyType)
-			if err != nil {
-				return fmt.Errorf("error serializing key '%v' in map: %w", key, err)
-			}
-
-			err = r.serializeAny(value, m.ValueType)
-			if err != nil {
-				return fmt.Errorf("error serializing value '%v' in map: %w", value, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (r *Record) DeserializeInt(offset RecordOffset) (int, RecordOffset) {
-	return int((*r)[offset])<<24 |
-		int((*r)[offset+1])<<16 |
-		int((*r)[offset+2])<<8 |
-		int((*r)[offset+3]), offset + 4
-}
-
-func (r *Record) DeserializeLong(offset RecordOffset) (int64, RecordOffset) {
-	return int64((*r)[offset])<<56 |
-		int64((*r)[offset+1])<<48 |
-		int64((*r)[offset+2])<<40 |
-		int64((*r)[offset+3])<<32 |
-		int64((*r)[offset+4])<<24 |
-		int64((*r)[offset+5])<<16 |
-		int64((*r)[offset+6])<<8 |
-		int64((*r)[offset+7]), offset + 8
-}
-
-func (r *Record) DeserializeFloat(offset RecordOffset) (float32, RecordOffset) {
-	val, newOffset := r.DeserializeInt(offset)
-	return math.Float32frombits(uint32(val)), newOffset
-}
-
-func (r *Record) DeserializeDouble(offset RecordOffset) (float64, RecordOffset) {
-	val, newOffset := r.DeserializeLong(offset)
-	return math.Float64frombits(uint64(val)), newOffset
-}
-
-func (r *Record) DeserializeBool(offset RecordOffset) (bool, RecordOffset) {
-	return (*r)[offset] != 0, offset + 1
-}
-
-func (r *Record) DeserializeString(offset RecordOffset) (string, RecordOffset) {
-	length, newOffset := r.DeserializeInt(offset)
-	return string((*r)[newOffset : int(newOffset)+length]), newOffset + RecordOffset(length)
-}
-
-func (r *Record) DeserializeTime(offset RecordOffset) (time.Time, RecordOffset) {
-	val, newOffset := r.DeserializeLong(offset)
-	return time.Unix(0, val), newOffset
-}
-
-func (r *Record) deserializeAny(offset RecordOffset, elementType ElementType) (
-	any, RecordOffset, error,
-) {
-	var val any
-	var newOffset RecordOffset
+	var offsetAfterWrite uint16
 	var err error
-
-	switch elementType {
-	case INTEGER:
-		val, newOffset = r.DeserializeInt(offset)
-	case LONG:
-		val, newOffset = r.DeserializeLong(offset)
-	case FLOAT:
-		val, newOffset = r.DeserializeFloat(offset)
-	case DOUBLE:
-		val, newOffset = r.DeserializeDouble(offset)
-	case BOOLEAN:
-		val, newOffset = r.DeserializeBool(offset)
-	case STRING:
-		val, newOffset = r.DeserializeString(offset)
-	case TIME:
-		val, newOffset = r.DeserializeTime(offset)
-	default:
-		err = errors.New(
-			fmt.Sprintf("invalid deserialization attempt for type: %T", elementType),
-		)
-	}
-	return val, newOffset, err
-}
-
-func (r *Record) DeserializeArray(offset RecordOffset) (Array, RecordOffset, error) {
-	length, newOffset := r.DeserializeInt(offset)
-	elementType := ElementType((*r)[newOffset])
-	newOffset++
-
-	if elementType == ARRAY {
-		return Array{
-			elementType,
-			[]any{},
-		}, offset, errors.New("arrays cannot be elements of an array")
-	}
-	if elementType == MAP {
-		return Array{
-			elementType,
-			[]any{},
-		}, offset, errors.New("maps cannot be elements of an array")
-	}
-
-	result := make([]any, length)
-	for i := 0; i < length; i++ {
-		var val any
-		var err error
-		val, newOffset, err = r.deserializeAny(newOffset, elementType)
-		if err != nil {
-			return Array{elementType, []any{}}, offset, err
+	switch value.(type) {
+	case uint:
+		if err = checkElementType(UINT32); err != nil {
+			offsetAfterWrite = offset
+			break
 		}
-		result[i] = val
+		r.writeUint32(offset, uint32(value.(uint)))
+		offsetAfterWrite = offset + 4
+	case uint32:
+		if err = checkElementType(UINT32); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint32(offset, value.(uint32))
+		offsetAfterWrite = offset + 4
+	case uint64:
+		if err = checkElementType(UINT64); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint64(offset, value.(uint64))
+		offsetAfterWrite = offset + 8
+	case int:
+		if err = checkElementType(INT32); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint32(offset, uint32(value.(int)))
+		offsetAfterWrite = offset + 4
+	case int32:
+		if err = checkElementType(INT32); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint32(offset, uint32(value.(int32)))
+		offsetAfterWrite = offset + 4
+	case int64:
+		if err = checkElementType(INT64); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint64(offset, uint64(value.(int64)))
+		offsetAfterWrite = offset + 8
+	case float32:
+		if err = checkElementType(FLOAT32); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint32(offset, math.Float32bits(value.(float32)))
+		offsetAfterWrite = offset + 4
+	case float64:
+		if err = checkElementType(FLOAT64); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint64(offset, math.Float64bits(value.(float64)))
+		offsetAfterWrite = offset + 8
+	case bool:
+		if err = checkElementType(BOOL); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeBool(offset, value.(bool))
+		offsetAfterWrite = offset + 1
+	case string:
+		if err = checkElementType(STRING); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeString(offset, value.(string))
+		offsetAfterWrite = offset + bytesNeededForString(value.(string))
+	case time.Time:
+		if err = checkElementType(TIME); err != nil {
+			offsetAfterWrite = offset
+			break
+		}
+		r.writeUint64(offset, uint64(value.(time.Time).UnixNano()))
+		offsetAfterWrite = offset + 8
+	default:
+		err = fmt.Errorf("unsupported primitive type %T", value)
 	}
-
-	return Array{elementType, result}, newOffset, nil
+	return offsetAfterWrite, err
 }
 
-func (r *Record) DeserializeMap(offset RecordOffset) (Map, RecordOffset, error) {
-	length, newOffset := r.DeserializeInt(offset)
-	keyType, newOffset := ElementType((*r)[newOffset]), newOffset+1
-	valueType, newOffset := ElementType((*r)[newOffset]), newOffset+1
+func (r *Record) writeArray(offset uint16, a Array) (uint16, error) {
+	newOffset := offset
+	(*r)[newOffset] = byte(len(a.Values))
+	newOffset++
+	(*r)[newOffset] = byte(len(a.Values) >> 8)
+	newOffset++
+	(*r)[newOffset] = byte(a.ElementType)
+	newOffset++
+	for _, value := range a.Values {
+		var err error
+		newOffset, err = r.writePrimitive(newOffset, value, a.ElementType)
+		if err != nil {
+			return offset, err
+		}
+	}
+	return newOffset, nil
+}
 
-	result := make(map[any]any, length)
-	for i := 0; i < length; i++ {
+func (r *Record) writeMap(offset uint16, m Map) (uint16, error) {
+	newOffset := offset
+	(*r)[newOffset] = byte(len(m.Data))
+	newOffset++
+	(*r)[newOffset] = byte(len(m.Data) >> 8)
+	newOffset++
+	(*r)[newOffset] = byte(m.KeyType)
+	newOffset++
+	(*r)[newOffset] = byte(m.ValueType)
+	newOffset++
+	for key, value := range m.Data {
+		var err error
+		newOffset, err = r.writePrimitive(newOffset, key, m.KeyType)
+		if err != nil {
+			return offset, err
+		}
+		if m.ValueType == ARRAY {
+			newOffset, err = r.writeArray(newOffset, value.(Array))
+		} else {
+			newOffset, err = r.writePrimitive(newOffset, value, m.ValueType)
+		}
+		if err != nil {
+			return offset, err
+		}
+	}
+	return newOffset, nil
+}
+
+func (r *Record) readUint32(offset uint16) uint32 {
+	return binary.LittleEndian.Uint32((*r)[offset : offset+4])
+}
+
+func (r *Record) readUint64(offset uint16) uint64 {
+	return binary.LittleEndian.Uint64((*r)[offset : offset+8])
+}
+
+func (r *Record) readBool(offset uint16) bool {
+	return (*r)[offset] == 1
+}
+
+func (r *Record) readString(offset uint16) (string, uint16) {
+	strLen := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	return string((*r)[offset+2 : offset+2+strLen]), strLen
+}
+
+func (r *Record) readPrimitive(offset uint16, expectedType ElementType) (any, uint16, error) {
+	var value any
+	var offsetAfterRead uint16
+	var err error
+	switch expectedType {
+	case UINT32:
+		value = r.readUint32(offset)
+		offsetAfterRead = offset + 4
+	case UINT64:
+		value = r.readUint64(offset)
+		offsetAfterRead = offset + 8
+	case INT32:
+		value = int32(r.readUint32(offset))
+		offsetAfterRead = offset + 4
+	case INT64:
+		value = int64(r.readUint64(offset))
+		offsetAfterRead = offset + 8
+	case FLOAT32:
+		value = math.Float32frombits(r.readUint32(offset))
+		offsetAfterRead = offset + 4
+	case FLOAT64:
+		value = math.Float64frombits(r.readUint64(offset))
+		offsetAfterRead = offset + 8
+	case BOOL:
+		value = r.readBool(offset)
+		offsetAfterRead = offset + 1
+	case STRING:
+		strValue, strLen := r.readString(offset)
+		value = strValue
+		offsetAfterRead = offset + strLen + 2
+	case TIME:
+		value = time.Unix(0, int64(r.readUint64(offset)))
+		offsetAfterRead = offset + 8
+	default:
+		err = fmt.Errorf("unsupported primitive type %v", expectedType)
+	}
+	return value, offsetAfterRead, err
+}
+
+func (r *Record) readArray(offset uint16) (Array, uint16, error) {
+	arrayLen := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	offset += 2
+	elementType := ElementType((*r)[offset])
+	offset++
+	a := Array{Values: make([]any, arrayLen), ElementType: elementType}
+	for i := uint16(0); i < arrayLen; i++ {
+		var err error
+		a.Values[i], offset, err = r.readPrimitive(offset, elementType)
+		if err != nil {
+			return a, offset, err
+		}
+	}
+	return a, offset, nil
+}
+
+func (r *Record) readMap(offset uint16) (Map, uint16, error) {
+	mapLen := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+	offset += 2
+	keyType := ElementType((*r)[offset])
+	offset++
+	valueType := ElementType((*r)[offset])
+	offset++
+	m := Map{Data: make(map[any]any), KeyType: keyType, ValueType: valueType}
+	for i := uint16(0); i < mapLen; i++ {
 		var key any
 		var err error
-		key, newOffset, err = r.deserializeAny(newOffset, keyType)
+		key, offset, err = r.readPrimitive(offset, keyType)
 		if err != nil {
-			err = fmt.Errorf("error deserializing key in map: %w", err)
-			return Map{keyType, valueType, map[any]any{}}, offset, err
+			return m, offset, err
 		}
-
-		var value any
 		if valueType == ARRAY {
-			value, newOffset, err = r.DeserializeArray(newOffset)
-			if err != nil {
-				err = fmt.Errorf("error deserializing array value in map: %w", err)
-				return Map{keyType, valueType, map[any]any{}}, offset, err
-			}
+			m.Data[key], offset, err = r.readArray(offset)
 		} else {
-			value, newOffset, err = r.deserializeAny(newOffset, valueType)
-			if err != nil {
-				err = fmt.Errorf("error deserializing value in map: %w", err)
-				return Map{keyType, valueType, map[any]any{}}, offset, err
+			m.Data[key], offset, err = r.readPrimitive(offset, valueType)
+		}
+		if err != nil {
+			return m, offset, err
+		}
+	}
+	return m, offset, nil
+}
+
+// NewRecord takes in the number of elements that will be stored in a record and returns a record
+// initialized with the appropriate length, header length and offsets for element positions. All
+// offsets are initialized to 0, meaning that the values for those element positions are null by
+// default.
+func NewRecord(numElements uint16) *Record {
+	headerLength := 2 + 2*numElements
+	length := 2 + headerLength
+	r := Record(make([]byte, length))
+	binary.LittleEndian.PutUint16(r[0:2], length)
+	binary.LittleEndian.PutUint16(r[2:4], headerLength)
+	return &r
+}
+
+// Length returns the length of the record in bytes.
+func (r *Record) Length() uint16 {
+	return binary.LittleEndian.Uint16((*r)[0:2])
+}
+
+// SetUint32 saves the given uint32 value at the given element position in the record.
+func (r *Record) SetUint32(position ElementPosition, value uint32) {
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		r.setLength(offset + 4)
+		r.setOffset(position, offset)
+		*r = append(*r, make([]byte, 4)...)
+	}
+	r.writeUint32(offset, value)
+}
+
+// SetUint64 saves the given uint64 value at the given element position in the record.
+func (r *Record) SetUint64(position ElementPosition, value uint64) {
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		r.setLength(offset + 8)
+		r.setOffset(position, offset)
+		*r = append(*r, make([]byte, 8)...)
+	}
+	r.writeUint64(offset, value)
+}
+
+// SetInt32 saves the given int32 value at the given element position in the record.
+func (r *Record) SetInt32(position ElementPosition, value int32) {
+	r.SetUint32(position, uint32(value))
+}
+
+// SetInt64 saves the given int64 value at the given element position in the record.
+func (r *Record) SetInt64(position ElementPosition, value int64) {
+	r.SetUint64(position, uint64(value))
+}
+
+// SetFloat32 saves the given float32 value at the given element position in the record.
+func (r *Record) SetFloat32(position ElementPosition, value float32) {
+	r.SetUint32(position, math.Float32bits(value))
+}
+
+// SetFloat64 saves the given float64 value at the given element position in the record.
+func (r *Record) SetFloat64(position ElementPosition, value float64) {
+	r.SetUint64(position, math.Float64bits(value))
+}
+
+// SetBool saves the given bool value at the given element position in the record.
+func (r *Record) SetBool(position ElementPosition, value bool) {
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		r.setLength(offset + 1)
+		r.setOffset(position, offset)
+		*r = append(*r, byte(0))
+	}
+	r.writeBool(offset, value)
+}
+
+// SetTime saves the given time value at the given element position in the record.
+func (r *Record) SetTime(position ElementPosition, value time.Time) {
+	r.SetUint64(position, uint64(value.UnixNano()))
+}
+
+// SetString saves the given string value at the given element position in the record.
+//
+// If a string value is already stored at the given element position and the incoming value is
+// smaller or equal to the length of the existing string, the existing string is overwritten with
+// the new value. If the incoming value is larger than the length of the existing string, a
+// WriteOverflowError is returned.
+func (r *Record) SetString(position ElementPosition, value string) error {
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		numBytes := bytesNeededForString(value)
+		*r = append(*r, make([]byte, numBytes)...)
+		r.writeString(offset, value)
+		r.setOffset(position, offset)
+		r.setLength(offset + numBytes)
+	} else {
+		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+		requiredLength := uint16(len(value))
+		if currentLength < requiredLength {
+			return &WriteOverflowError{
+				currentLength, requiredLength, value,
 			}
 		}
-		result[key] = value
+		r.writeString(offset, value)
+	}
+	return nil
+}
+
+// SetArray saves the given Array value at the given element position in the record. Arrays cannot
+// have other arrays and maps as elements.
+//
+// If an Array value is already stored at the given element position and the incoming value is
+// smaller or equal to the length of the existing Array, the existing Array is overwritten with the
+// new value. If the incoming value is larger than the length of the existing array, a
+// WriteOverflowError is returned.
+//
+// If the type of incoming Array element type does not match the existing Array element type,
+// a TypeMismatchError is returned.
+func (r *Record) SetArray(position ElementPosition, a Array) error {
+	if a.ElementType == ARRAY {
+		return &InvalidElementTypeError{a.ElementType}
+	}
+	if a.ElementType == MAP {
+		return &InvalidElementTypeError{a.ElementType}
+	}
+	if a.Values == nil {
+		return nil
 	}
 
-	return Map{keyType, valueType, result}, newOffset, nil
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		numBytes, err := bytesNeededForArray(a)
+		if err != nil {
+			return err
+		}
+		*r = append(*r, make([]byte, numBytes)...)
+		_, err = r.writeArray(offset, a)
+		if err != nil {
+			return err
+		}
+		r.setOffset(position, offset)
+		r.setLength(offset + numBytes)
+	} else {
+		currentElementType := ElementType((*r)[offset+2])
+		if currentElementType != a.ElementType {
+			return &TypeMismatchError{currentElementType, a.ElementType}
+		}
+		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+		requiredLength := uint16(len(a.Values))
+		if currentLength < requiredLength {
+			return &WriteOverflowError{
+				currentLength, requiredLength, a,
+			}
+		}
+		_, err := r.writeArray(offset, a)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// SetMap saves the given Map value at the given element position in the record. Maps cannot have
+// arrays and other maps as keys. Maps cannot have other maps as values. Maps can have arrays as
+// values.
+//
+// If a Map value is already stored at the given element position and the incoming value is smaller
+// or equal to the length of the existing Map, the existing Map is overwritten with the new value.
+// If the incoming value is larger than the length of the existing Map, a WriteOverflowError is
+// returned.
+//
+// If the type of incoming Map key and value types do not match the existing Map key and value
+// types, a TypeMismatchError is returned.
+func (r *Record) SetMap(position ElementPosition, m Map) error {
+	if m.KeyType == ARRAY {
+		return &InvalidKeyTypeError{m.KeyType}
+	}
+	if m.KeyType == MAP {
+		return &InvalidKeyTypeError{m.KeyType}
+	}
+	if m.ValueType == MAP {
+		return &InvalidValueTypeError{m.ValueType}
+	}
+	if m.Data == nil {
+		return nil
+	}
+
+	offset := r.offsetForPosition(position)
+	if offset == 0 {
+		offset = r.Length()
+		numBytes, err := bytesNeededForMap(m)
+		if err != nil {
+			return err
+		}
+		*r = append(*r, make([]byte, numBytes)...)
+		_, err = r.writeMap(offset, m)
+		if err != nil {
+			return err
+		}
+		r.setOffset(position, offset)
+		r.setLength(offset + numBytes)
+	} else {
+		currentKeyType := ElementType((*r)[offset+2])
+		if currentKeyType != m.KeyType {
+			err := &TypeMismatchError{currentKeyType, m.KeyType}
+			return fmt.Errorf("key type mismatch: %w", err)
+		}
+		currentValueType := ElementType((*r)[offset+3])
+		if currentValueType != m.ValueType {
+			err := &TypeMismatchError{currentValueType, m.ValueType}
+			return fmt.Errorf("value type mismatch: %w", err)
+		}
+		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
+		requiredLength := uint16(len(m.Data))
+		if currentLength < requiredLength {
+			return &WriteOverflowError{
+				currentLength, requiredLength, m,
+			}
+		}
+		_, err := r.writeMap(offset, m)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetUint32 returns the uint32 value stored at the given element position in the record.
+func (r *Record) GetUint32(position ElementPosition) (isNull bool, value uint32) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = binary.LittleEndian.Uint32((*r)[offset : offset+4])
+	}
+	return isNull, value
+}
+
+// GetUint64 returns the uint64 value stored at the given element position in the record.
+func (r *Record) GetUint64(position ElementPosition) (isNull bool, value uint64) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = binary.LittleEndian.Uint64((*r)[offset : offset+8])
+	}
+	return isNull, value
+}
+
+// GetInt32 returns the int32 value stored at the given element position in the record.
+func (r *Record) GetInt32(position ElementPosition) (isNull bool, value int32) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = int32(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+	}
+	return isNull, value
+}
+
+// GetInt64 returns the int64 value stored at the given element position in the record.
+func (r *Record) GetInt64(position ElementPosition) (isNull bool, value int64) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = int64(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+	}
+	return isNull, value
+}
+
+// GetFloat32 returns the float32 value stored at the given element position in the record.
+func (r *Record) GetFloat32(position ElementPosition) (isNull bool, value float32) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = math.Float32frombits(binary.LittleEndian.Uint32((*r)[offset : offset+4]))
+	}
+	return isNull, value
+}
+
+// GetFloat64 returns the float64 value stored at the given element position in the record.
+func (r *Record) GetFloat64(position ElementPosition) (isNull bool, value float64) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = math.Float64frombits(binary.LittleEndian.Uint64((*r)[offset : offset+8]))
+	}
+	return isNull, value
+}
+
+// GetBool returns the bool value stored at the given element position in the record.
+func (r *Record) GetBool(position ElementPosition) (isNull bool, value bool) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = (*r)[offset] != 0
+	}
+	return isNull, value
+}
+
+// GetTime returns the Timestamp value stored at the given element position in the record.
+func (r *Record) GetTime(position ElementPosition) (isNull bool, value time.Time) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value = time.Unix(0, int64(binary.LittleEndian.Uint64((*r)[offset:offset+8])))
+	}
+	return isNull, value
+}
+
+// GetString returns the string value stored at the given element position in the record.
+func (r *Record) GetString(position ElementPosition) (isNull bool, value string) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value, _ = r.readString(offset)
+	}
+	return isNull, value
+}
+
+// GetArray returns the Array value stored at the given element position in the record.
+func (r *Record) GetArray(position ElementPosition) (isNull bool, value Array, err error) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value, _, err = r.readArray(offset)
+	}
+	return isNull, value, err
+}
+
+// GetMap returns the Map value stored at the given element position in the record.
+func (r *Record) GetMap(position ElementPosition) (isNull bool, value Map, err error) {
+	offset := r.offsetForPosition(position)
+	isNull = offset == 0
+	if !isNull {
+		value, _, err = r.readMap(offset)
+	}
+	return isNull, value, err
 }
