@@ -8,18 +8,18 @@ import (
 )
 
 const (
-	NULL    ElementType = '\x00'
-	UINT32  ElementType = 'u'
-	UINT64  ElementType = 'v'
-	INT32   ElementType = 'i'
-	INT64   ElementType = 'l'
-	FLOAT32 ElementType = 'f'
-	FLOAT64 ElementType = 'd'
-	BOOL    ElementType = 'b'
-	STRING  ElementType = 's'
-	TIME    ElementType = 't'
-	ARRAY   ElementType = 'a'
-	MAP     ElementType = 'm'
+	NullType    ElementType = '\x00'
+	Uint32Type  ElementType = 'u'
+	Uint64Type  ElementType = 'v'
+	Int32Type   ElementType = 'i'
+	Int64Type   ElementType = 'l'
+	Float32Type ElementType = 'f'
+	Float64Type ElementType = 'd'
+	BoolType    ElementType = 'b'
+	StringType  ElementType = 's'
+	TimeType    ElementType = 't'
+	ArrayType   ElementType = 'a'
+	MapType     ElementType = 'm'
 )
 
 type Record []byte
@@ -121,29 +121,29 @@ func nameForElementType(elemType ElementType) (string, error) {
 	var elemTypeName string
 	var err error
 	switch elemType {
-	case NULL:
+	case NullType:
 		elemTypeName = "null"
-	case UINT32:
+	case Uint32Type:
 		elemTypeName = "uint32"
-	case UINT64:
+	case Uint64Type:
 		elemTypeName = "uint64"
-	case INT32:
+	case Int32Type:
 		elemTypeName = "int32"
-	case INT64:
+	case Int64Type:
 		elemTypeName = "int64"
-	case FLOAT32:
+	case Float32Type:
 		elemTypeName = "float32"
-	case FLOAT64:
+	case Float64Type:
 		elemTypeName = "float64"
-	case BOOL:
+	case BoolType:
 		elemTypeName = "bool"
-	case STRING:
+	case StringType:
 		elemTypeName = "string"
-	case TIME:
+	case TimeType:
 		elemTypeName = "time"
-	case ARRAY:
+	case ArrayType:
 		elemTypeName = "array"
-	case MAP:
+	case MapType:
 		elemTypeName = "map"
 	default:
 		err = &UnrecognizedTypeError{elemType}
@@ -195,7 +195,7 @@ func bytesNeededForMap(m Map) (uint16, error) {
 			break
 		}
 		var bytesNeededForValue uint16
-		if m.ValueType == ARRAY {
+		if m.ValueType == ArrayType {
 			bytesNeededForValue, err = bytesNeededForArray(value.(Array))
 		} else {
 			bytesNeededForValue, err = bytesNeededForPrimitive(value)
@@ -271,77 +271,77 @@ func (r *Record) writePrimitive(offset uint16, value any, expectedType ElementTy
 	var err error
 	switch value.(type) {
 	case uint:
-		if err = checkElementType(UINT32); err != nil {
+		if err = checkElementType(Uint32Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint32(offset, uint32(value.(uint)))
 		offsetAfterWrite = offset + 4
 	case uint32:
-		if err = checkElementType(UINT32); err != nil {
+		if err = checkElementType(Uint32Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint32(offset, value.(uint32))
 		offsetAfterWrite = offset + 4
 	case uint64:
-		if err = checkElementType(UINT64); err != nil {
+		if err = checkElementType(Uint64Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint64(offset, value.(uint64))
 		offsetAfterWrite = offset + 8
 	case int:
-		if err = checkElementType(INT32); err != nil {
+		if err = checkElementType(Int32Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint32(offset, uint32(value.(int)))
 		offsetAfterWrite = offset + 4
 	case int32:
-		if err = checkElementType(INT32); err != nil {
+		if err = checkElementType(Int32Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint32(offset, uint32(value.(int32)))
 		offsetAfterWrite = offset + 4
 	case int64:
-		if err = checkElementType(INT64); err != nil {
+		if err = checkElementType(Int64Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint64(offset, uint64(value.(int64)))
 		offsetAfterWrite = offset + 8
 	case float32:
-		if err = checkElementType(FLOAT32); err != nil {
+		if err = checkElementType(Float32Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint32(offset, math.Float32bits(value.(float32)))
 		offsetAfterWrite = offset + 4
 	case float64:
-		if err = checkElementType(FLOAT64); err != nil {
+		if err = checkElementType(Float64Type); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeUint64(offset, math.Float64bits(value.(float64)))
 		offsetAfterWrite = offset + 8
 	case bool:
-		if err = checkElementType(BOOL); err != nil {
+		if err = checkElementType(BoolType); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeBool(offset, value.(bool))
 		offsetAfterWrite = offset + 1
 	case string:
-		if err = checkElementType(STRING); err != nil {
+		if err = checkElementType(StringType); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
 		r.writeString(offset, value.(string))
 		offsetAfterWrite = offset + bytesNeededForString(value.(string))
 	case time.Time:
-		if err = checkElementType(TIME); err != nil {
+		if err = checkElementType(TimeType); err != nil {
 			offsetAfterWrite = offset
 			break
 		}
@@ -387,7 +387,7 @@ func (r *Record) writeMap(offset uint16, m Map) (uint16, error) {
 		if err != nil {
 			return offset, err
 		}
-		if m.ValueType == ARRAY {
+		if m.ValueType == ArrayType {
 			newOffset, err = r.writeArray(newOffset, value.(Array))
 		} else {
 			newOffset, err = r.writePrimitive(newOffset, value, m.ValueType)
@@ -421,32 +421,32 @@ func (r *Record) readPrimitive(offset uint16, expectedType ElementType) (any, ui
 	var offsetAfterRead uint16
 	var err error
 	switch expectedType {
-	case UINT32:
+	case Uint32Type:
 		value = r.readUint32(offset)
 		offsetAfterRead = offset + 4
-	case UINT64:
+	case Uint64Type:
 		value = r.readUint64(offset)
 		offsetAfterRead = offset + 8
-	case INT32:
+	case Int32Type:
 		value = int32(r.readUint32(offset))
 		offsetAfterRead = offset + 4
-	case INT64:
+	case Int64Type:
 		value = int64(r.readUint64(offset))
 		offsetAfterRead = offset + 8
-	case FLOAT32:
+	case Float32Type:
 		value = math.Float32frombits(r.readUint32(offset))
 		offsetAfterRead = offset + 4
-	case FLOAT64:
+	case Float64Type:
 		value = math.Float64frombits(r.readUint64(offset))
 		offsetAfterRead = offset + 8
-	case BOOL:
+	case BoolType:
 		value = r.readBool(offset)
 		offsetAfterRead = offset + 1
-	case STRING:
+	case StringType:
 		strValue, strLen := r.readString(offset)
 		value = strValue
 		offsetAfterRead = offset + strLen + 2
-	case TIME:
+	case TimeType:
 		value = time.Unix(0, int64(r.readUint64(offset)))
 		offsetAfterRead = offset + 8
 	default:
@@ -486,7 +486,7 @@ func (r *Record) readMap(offset uint16) (Map, uint16, error) {
 		if err != nil {
 			return m, offset, err
 		}
-		if valueType == ARRAY {
+		if valueType == ArrayType {
 			m.Data[key], offset, err = r.readArray(offset)
 		} else {
 			m.Data[key], offset, err = r.readPrimitive(offset, valueType)
@@ -616,10 +616,10 @@ func (r *Record) SetString(position ElementPosition, value string) error {
 // If the type of incoming Array element type does not match the existing Array element type,
 // a TypeMismatchError is returned.
 func (r *Record) SetArray(position ElementPosition, a Array) error {
-	if a.ElementType == ARRAY {
+	if a.ElementType == ArrayType {
 		return &InvalidElementTypeError{a.ElementType}
 	}
-	if a.ElementType == MAP {
+	if a.ElementType == MapType {
 		return &InvalidElementTypeError{a.ElementType}
 	}
 	if a.Values == nil {
@@ -672,13 +672,13 @@ func (r *Record) SetArray(position ElementPosition, a Array) error {
 // If the type of incoming Map key and value types do not match the existing Map key and value
 // types, a TypeMismatchError is returned.
 func (r *Record) SetMap(position ElementPosition, m Map) error {
-	if m.KeyType == ARRAY {
+	if m.KeyType == ArrayType {
 		return &InvalidKeyTypeError{m.KeyType}
 	}
-	if m.KeyType == MAP {
+	if m.KeyType == MapType {
 		return &InvalidKeyTypeError{m.KeyType}
 	}
-	if m.ValueType == MAP {
+	if m.ValueType == MapType {
 		return &InvalidValueTypeError{m.ValueType}
 	}
 	if m.Data == nil {
