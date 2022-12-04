@@ -64,10 +64,10 @@ func slotEntryToRecordAddress(offset slotEntry) RecordAddress {
 	}
 }
 
-// isForwarded returns true if a slotEntry represents a forwarded address. If the first two bytes
+// isForwardedAddress returns true if a slotEntry represents a forwarded address. If the first two bytes
 // are max uint16, then the slot entry is a not a forwarded address. We use max uint16 because
 // the file ID is stored as uint16, but no file ID is ever max uint16.
-func (s slotEntry) isForwarded() bool {
+func (s slotEntry) isForwardedAddress() bool {
 	return s>>48 == 0xffff
 }
 
@@ -83,37 +83,101 @@ func (s slotEntry) isForwarded() bool {
 
 // setNumSlots sets the number of slots in the page.
 func (p *Page) setNumSlots(numSlots uint16) {
-	binary.BigEndian.PutUint16(p[:2], numSlots)
+	binary.LittleEndian.PutUint16(p[:2], numSlots)
 }
 
 // getNumSlots returns the number of slots in the page.
 func (p *Page) getNumSlots() uint16 {
-	return binary.BigEndian.Uint16(p[:2])
+	return binary.LittleEndian.Uint16(p[:2])
 }
 
 // setFreeOffset sets the offset to the free space on the page.
 func (p *Page) setFreeOffset(offset uint16) {
-	binary.BigEndian.PutUint16(p[2:4], offset)
+	binary.LittleEndian.PutUint16(p[2:4], offset)
 }
 
 // getFreeOffset returns the offset to the free space on the page.
 func (p *Page) getFreeOffset() uint16 {
-	return binary.BigEndian.Uint16(p[2:4])
+	return binary.LittleEndian.Uint16(p[2:4])
 }
 
 // addSlot adds a slot entry to the page.
 func (p *Page) addSlot(slot slotEntry) {
 	numSlots := p.getNumSlots()
-	binary.BigEndian.PutUint64(p[4+8*numSlots:], uint64(slot))
+	binary.LittleEndian.PutUint64(p[4+8*numSlots:], uint64(slot))
 	p.setNumSlots(numSlots + 1)
 }
 
 // setSlot sets the slot entry at the given slot number.
 func (p *Page) setSlot(slotNum uint16, slot slotEntry) {
-	binary.BigEndian.PutUint64(p[4+8*slotNum:], uint64(slot))
+	binary.LittleEndian.PutUint64(p[4+8*slotNum:], uint64(slot))
 }
 
 // getSlot returns the slot entry at the given number.
 func (p *Page) getSlot(slotNum uint16) slotEntry {
-	return slotEntry(binary.BigEndian.Uint64(p[4+8*slotNum:]))
+	return slotEntry(binary.LittleEndian.Uint64(p[4+8*slotNum:]))
+}
+
+// NewPage returns a new page.
+func NewPage() *Page {
+	p := &Page{}
+	p.setNumSlots(0)
+	p.setFreeOffset(PageSize)
+	return p
+}
+
+// AddRecord adds a record to the page. It returns the slot number of the record.
+func (p *Page) AddRecord(record *Record) (uint16, error) {
+	// Get the free offset.
+	offset := p.getFreeOffset()
+
+	// Get the number of slots.
+	numSlots := p.getNumSlots()
+
+	// Calculate the new free offset.
+	newOffset := offset - record.Length()
+
+	// Check if the page has enough space for the record.
+	headerLength := 4 + 8*numSlots
+	newHeaderEnd := headerLength + 8
+	if newOffset < newHeaderEnd {
+		return 0, &PageFullError{
+			available: offset - newHeaderEnd,
+			needed:    record.Length(),
+		}
+	}
+
+	// Write the record to the page.
+	copy(p[newOffset:offset], *record)
+
+	// Add the slot entry.
+	p.addSlot(slotEntry(newOffset))
+
+	// Update the free offset.
+	p.setFreeOffset(newOffset)
+
+	// Return the slot number (zero-indexed), which is now the same as the original number of slots.
+	return numSlots, nil
+}
+
+// GetRecord returns the record at the given slot number.
+func (p *Page) GetRecord(slotNum uint16) (bool, *Record, RecordAddress) {
+	// Get the slot entry value.
+	entry := p.getSlot(slotNum)
+
+	// If the slot entry is 0 (tombstone), then the record has been deleted.
+	if entry == 0 {
+		return true, nil, RecordAddress{}
+	}
+
+	// If the slot entry is a forwarded address then return the forwarded address.
+	if entry.isForwardedAddress() {
+		addr := slotEntryToRecordAddress(entry)
+		return false, nil, addr
+	}
+
+	// Otherwise return the record at the entry.
+	recordLength := binary.LittleEndian.Uint16(p[entry : entry+2])
+	record := Record(p[entry : uint16(entry)+recordLength])
+	return false, &record, RecordAddress{}
 }
