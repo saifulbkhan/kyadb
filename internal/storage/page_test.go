@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -68,6 +69,9 @@ func TestPage_AddRecord(t *testing.T) {
 			// The following record is 24 bytes long.
 			r := NewRecord(1)
 			err := r.SetString(0, "this is a record")
+			if err != nil {
+				t.Error(err)
+			}
 
 			// The record along with its slot each take (24 + 8) bytes. Therefore, we can only add
 			// abs((PageSize - 4) / (24 + 8)) = 255 records to the page.
@@ -135,22 +139,260 @@ func TestPage_GetRecord(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			if got == r1 {
+			if !reflect.DeepEqual(got, r1) {
 				t.Errorf("expected record %v, got %v", r1, got)
 			}
 			got, _, err = page.GetRecord(1)
 			if err != nil {
 				t.Error(err)
 			}
-			if got == r2 {
+			if !reflect.DeepEqual(got, r2) {
 				t.Errorf("expected record %v, got %v", r2, got)
 			}
 			got, _, err = page.GetRecord(2)
 			if err != nil {
 				t.Error(err)
 			}
-			if got == r3 {
+			if !reflect.DeepEqual(got, r3) {
 				t.Errorf("expected record %v, got %v", r3, got)
+			}
+		},
+	)
+}
+
+func TestPage_SetForwardedAddress(t *testing.T) {
+	t.Run(
+		"check setting of forwarded address", func(t *testing.T) {
+			record := NewRecord(4)
+			record.SetUint32(0, 2048)
+
+			page := NewPage()
+			slotNum, err := page.AddRecord(record)
+			if err != nil {
+				return
+			}
+			want := RecordAddress{PageAddress: PageAddress{FileID: 0, PageNum: 1}, SlotNum: 2}
+			page.SetForwardedAddress(slotNum, want)
+			got := slotEntryToRecordAddress(page.getSlot(slotNum))
+			if got != want {
+				t.Errorf("expected forwarded address %v, got %v", want, got)
+			}
+		},
+	)
+}
+
+func TestPage_UpdateRecord(t *testing.T) {
+	t.Run(
+		"check updating of record", func(t *testing.T) {
+			r1 := NewRecord(2)
+			r1.SetUint32(0, 1024)
+			r1.SetUint32(1, 2048)
+
+			r2 := NewRecord(2)
+			err := r2.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r2.SetString(1, "foo")
+			if err != nil {
+				t.Error(err)
+			}
+
+			r3 := NewRecord(2)
+			err = r3.SetArray(0, Array{Int32Type, []any{1, 2, 3}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r3.SetMap(
+				1,
+				Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}},
+			)
+			if err != nil {
+				t.Error(err)
+			}
+
+			page := NewPage()
+			slotNum1, err := page.AddRecord(r1)
+			if err != nil {
+				t.Error(err)
+			}
+			slotNum2, err := page.AddRecord(r2)
+			if err != nil {
+				t.Error(err)
+			}
+			slotNum3, err := page.AddRecord(r3)
+			if err != nil {
+				t.Error(err)
+			}
+
+			r1.SetUint32(1, 4096)
+			_, err = page.UpdateRecord(slotNum1, r1)
+			if err != nil {
+				t.Error(err)
+			}
+			got, _, err := page.GetRecord(slotNum1)
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(got, r1) {
+				t.Errorf("expected r1 %v, got %v", r1, got)
+			}
+
+			err = r2.SetString(1, "bar")
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = page.UpdateRecord(slotNum2, r2)
+			if err != nil {
+				t.Error(err)
+			}
+			got, _, err = page.GetRecord(slotNum2)
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(got, r2) {
+				t.Errorf("expected r2 %v, got %v", r2, got)
+			}
+
+			err = r3.SetArray(0, Array{Int32Type, []any{4, 5, 6}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r3.SetMap(
+				1,
+				Map{StringType, Int32Type, map[any]any{"c": 3, "d": 4}},
+			)
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = page.UpdateRecord(slotNum3, r3)
+			if err != nil {
+				t.Error(err)
+			}
+			got, _, err = page.GetRecord(slotNum3)
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(got, r3) {
+				t.Errorf("expected r3 %v, got %v", r3, got)
+			}
+		},
+	)
+
+	t.Run(
+		"check updating of record larger than existing record", func(t *testing.T) {
+			r1 := NewRecord(2)
+			r1.SetUint32(0, 1024)
+			r1.SetUint32(1, 2048)
+
+			r2 := NewRecord(2)
+			err := r2.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r2.SetString(1, "foo")
+			if err != nil {
+				t.Error(err)
+			}
+
+			r3 := NewRecord(2)
+			err = r3.SetArray(0, Array{Int32Type, []any{1, 2, 3}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r3.SetMap(
+				1,
+				Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}},
+			)
+			if err != nil {
+				t.Error(err)
+			}
+
+			page := NewPage()
+			_, err = page.AddRecord(r1)
+			if err != nil {
+				t.Error(err)
+			}
+			slotNum2, err := page.AddRecord(r2)
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = page.AddRecord(r3)
+			if err != nil {
+				t.Error(err)
+			}
+			originalOffset := page.getSlot(slotNum2)
+
+			r2 = NewRecord(2)
+			err = r2.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r2.SetString(1, "world")
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = page.UpdateRecord(slotNum2, r2)
+			if err != nil {
+				t.Error(err)
+			}
+			got, _, err := page.GetRecord(slotNum2)
+			if err != nil {
+				t.Error(err)
+			}
+			if !reflect.DeepEqual(got, r2) {
+				t.Errorf("expected record %v, got %v", r2, got)
+			}
+
+			newOffset := page.getSlot(slotNum2)
+			if newOffset >= originalOffset {
+				t.Errorf(
+					"expected new offset %v to be less than original offset %v",
+					newOffset,
+					originalOffset,
+				)
+			}
+		},
+	)
+
+	t.Run(
+		"check page full error", func(t *testing.T) {
+			page := NewPage()
+
+			// The following record is 24 bytes long.
+			r := NewRecord(1)
+			err := r.SetString(0, "this is a record")
+			if err != nil {
+				t.Error(err)
+			}
+
+			// The record along with its slot each take (24 + 8) bytes. Therefore, we can only add
+			// abs((PageSize - 4) / (24 + 8)) = 255 records to the page.
+			for i := 0; i < 255; i++ {
+				_, err := page.AddRecord(r)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+
+			// Updating any existing record with a record of smaller size should not cause an error.
+			err = r.SetString(0, "this is a")
+			if err != nil {
+				return
+			}
+			_, err = page.UpdateRecord(0, r)
+			if err != nil {
+				t.Error(err)
+			}
+
+			// Updating any existing record with a record of larger size should cause an error.
+			err = r.SetString(0, "this is a record that is a bit too long to fit")
+			if err != nil {
+				return
+			}
+			_, err = page.UpdateRecord(0, r)
+			if err == nil {
+				t.Error("expected error, got nil")
 			}
 		},
 	)

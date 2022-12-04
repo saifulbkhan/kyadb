@@ -170,25 +170,87 @@ func (p *Page) AddRecord(record *Record) (uint16, error) {
 }
 
 // GetRecord returns the record at the given slot number.
-func (p *Page) GetRecord(slotNum uint16) (*Record, RecordAddress, error) {
+//
+// If the record is no longer on the page but has been moved to another page then the second return
+// value is set to a non-nil address value instead.
+//
+// If the record has been deleted then RecordDeletedError is returned.
+func (p *Page) GetRecord(slotNum uint16) (*Record, *RecordAddress, error) {
 	// Get the slot entry value.
 	entry := p.getSlot(slotNum)
 
 	// If the slot entry is 0 (tombstone), then the record has been deleted.
 	if entry == 0 {
-		return nil, RecordAddress{}, &RecordDeletedError{slotNum}
+		return nil, nil, &RecordDeletedError{slotNum}
 	}
 
 	// If the slot entry is a forwarded address then return the forwarded address.
 	if entry.isForwardedAddress() {
-		// TODO: Instead of returning a forwarded address, we should follow the address and return
-		//  the record.
 		addr := slotEntryToRecordAddress(entry)
-		return nil, addr, nil
+		return nil, &addr, nil
 	}
 
 	// Otherwise return the record at the entry.
 	recordLength := binary.LittleEndian.Uint16(p[entry : entry+2])
 	record := Record(p[entry : uint16(entry)+recordLength])
-	return &record, RecordAddress{}, nil
+	return &record, nil, nil
+}
+
+// SetForwardedAddress sets the slot entry to a forwarded address.
+func (p *Page) SetForwardedAddress(slotNum uint16, addr RecordAddress) {
+	p.setSlot(slotNum, recordAddressToSlotEntry(addr))
+}
+
+// UpdateRecord updates a record at the given slot number.
+//
+// If the record is no longer on the page but has been moved to another page then the first return
+// value is set to a non-nil address value instead. This new address should be used to update the
+// record.
+//
+// If the record has been deleted then RecordDeletedError is returned.
+//
+// If the updated record is too large to fit on the page then PageFullError is returned. When
+// PageFullError is returned the record is not updated. It is the caller's responsibility to add the
+// updated record to a new page and update the record's slot entry to its new address on this page
+// using the SetForwardedAddress method.
+func (p *Page) UpdateRecord(slotNum uint16, record *Record) (*RecordAddress, error) {
+	// Get the slot entry value.
+	entry := p.getSlot(slotNum)
+
+	// If the slot entry is 0 (tombstone), then the record has been deleted.
+	if entry == 0 {
+		return nil, &RecordDeletedError{slotNum}
+	}
+
+	// If the slot entry is a forwarded address then return the forwarded address.
+	if entry.isForwardedAddress() {
+		addr := slotEntryToRecordAddress(entry)
+		return &addr, nil
+	}
+
+	// Otherwise update the record at the entry.
+	recordLength := binary.LittleEndian.Uint16(p[entry : entry+2])
+	if recordLength < record.Length() {
+		// If the new record is larger than the existing one, then we need to move the record to a
+		// new location on the page and update the slot entry.
+		offset := p.getFreeOffset()
+		newOffset := offset - record.Length()
+
+		// Check if the page has enough space for the record.
+		numSlots := p.getNumSlots()
+		headerLength := 4 + 8*numSlots
+		newHeaderEnd := headerLength + 8
+		if newOffset < newHeaderEnd {
+			return nil, &PageFullError{
+				available: offset - newHeaderEnd,
+				needed:    record.Length(),
+			}
+		}
+
+		copy(p[newOffset:], *record)
+		p.setSlot(slotNum, slotEntry(newOffset))
+		p.setFreeOffset(newOffset)
+	}
+	copy(p[entry:uint16(entry)+recordLength], *record)
+	return nil, nil
 }
