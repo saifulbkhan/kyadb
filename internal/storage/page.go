@@ -40,10 +40,19 @@ type PageFullError struct {
 	needed    uint16
 }
 
+// RecordDeletedError is returned when a record is not present at the expected slot number.
+type RecordDeletedError struct {
+	SlotNum uint16
+}
+
 func (e *PageFullError) Error() string {
 	return fmt.Sprintf(
 		"operation cannot be completed, page full: available=%d, needed=%d", e.available, e.needed,
 	)
+}
+
+func (e *RecordDeletedError) Error() string {
+	return fmt.Sprintf("record at slot=%d has been deleted", e.SlotNum)
 }
 
 // recordAddressToSlotEntry casts a RecordAddress to a slotEntry.
@@ -161,23 +170,25 @@ func (p *Page) AddRecord(record *Record) (uint16, error) {
 }
 
 // GetRecord returns the record at the given slot number.
-func (p *Page) GetRecord(slotNum uint16) (bool, *Record, RecordAddress) {
+func (p *Page) GetRecord(slotNum uint16) (*Record, RecordAddress, error) {
 	// Get the slot entry value.
 	entry := p.getSlot(slotNum)
 
 	// If the slot entry is 0 (tombstone), then the record has been deleted.
 	if entry == 0 {
-		return true, nil, RecordAddress{}
+		return nil, RecordAddress{}, &RecordDeletedError{slotNum}
 	}
 
 	// If the slot entry is a forwarded address then return the forwarded address.
 	if entry.isForwardedAddress() {
+		// TODO: Instead of returning a forwarded address, we should follow the address and return
+		//  the record.
 		addr := slotEntryToRecordAddress(entry)
-		return false, nil, addr
+		return nil, addr, nil
 	}
 
 	// Otherwise return the record at the entry.
 	recordLength := binary.LittleEndian.Uint16(p[entry : entry+2])
 	record := Record(p[entry : uint16(entry)+recordLength])
-	return false, &record, RecordAddress{}
+	return &record, RecordAddress{}, nil
 }

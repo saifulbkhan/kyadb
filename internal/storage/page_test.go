@@ -131,21 +131,21 @@ func TestPage_GetRecord(t *testing.T) {
 			}
 
 			// Check that the records are retrieved in the same order as they were added.
-			_, got, _ := page.GetRecord(0)
+			got, _, err := page.GetRecord(0)
 			if err != nil {
 				t.Error(err)
 			}
 			if got == r1 {
 				t.Errorf("expected record %v, got %v", r1, got)
 			}
-			_, got, _ = page.GetRecord(1)
+			got, _, err = page.GetRecord(1)
 			if err != nil {
 				t.Error(err)
 			}
 			if got == r2 {
 				t.Errorf("expected record %v, got %v", r2, got)
 			}
-			_, got, _ = page.GetRecord(2)
+			got, _, err = page.GetRecord(2)
 			if err != nil {
 				t.Error(err)
 			}
