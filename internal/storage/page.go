@@ -254,3 +254,7 @@ func (p *Page) UpdateRecord(slotNum uint16, record *Record) (*RecordAddress, err
 	copy(p[entry:uint16(entry)+recordLength], *record)
 	return nil, nil
 }
+
+func (p *Page) DeleteRecord(slotNum uint16) {
+	p.setSlot(slotNum, 0)
+}

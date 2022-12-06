@@ -397,3 +397,61 @@ func TestPage_UpdateRecord(t *testing.T) {
 		},
 	)
 }
+
+func TestPage_DeleteRecord(t *testing.T) {
+	t.Run(
+		"check deletion of records", func(t *testing.T) {
+			page := NewPage()
+
+			r1 := NewRecord(2)
+			r1.SetUint32(0, 1024)
+			r1.SetUint32(1, 2048)
+
+			r2 := NewRecord(2)
+			err := r2.SetString(0, "hello")
+			if err != nil {
+				t.Error(err)
+			}
+			err = r2.SetString(1, "foo")
+			if err != nil {
+				t.Error(err)
+			}
+
+			r3 := NewRecord(2)
+			err = r3.SetArray(0, Array{Int32Type, []any{1, 2, 3}})
+			if err != nil {
+				t.Error(err)
+			}
+			err = r3.SetMap(
+				1,
+				Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}},
+			)
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = page.AddRecord(r1)
+			if err != nil {
+				t.Error(err)
+			}
+			slotNum2, err := page.AddRecord(r2)
+			if err != nil {
+				t.Error(err)
+			}
+			_, err = page.AddRecord(r3)
+			if err != nil {
+				t.Error(err)
+			}
+
+			page.DeleteRecord(slotNum2)
+			_, _, err = page.GetRecord(slotNum2)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+			_, err = page.UpdateRecord(slotNum2, r2)
+			if err == nil {
+				t.Error("expected error, got nil")
+			}
+		},
+	)
+}
