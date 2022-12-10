@@ -5,12 +5,17 @@ import (
 	"fmt"
 )
 
-const (
-	PageSize        = 8 * 1024
-	MaxPagesPerFile = 256 * 1024
-	MaxFileSize     = PageSize * MaxPagesPerFile // 2GB
-	MaxNumFiles     = 1024
-)
+/*
+ * First two bytes of the page store the number of slots in the page.
+ * The next two bytes store an offset to the free space on the page.
+ * After that is an array of slot entries. Each slot entry is 8 bytes and stores the byte offset or
+ * the forwarded database address of a record.
+ * The slot array is followed by the free space on the page.
+ * The records are stored in reverse order on the page. The first record is stored at the end of
+ * the page. The next record is stored before the first record and so on.
+ */
+
+const PageSize = 8 * 1024
 
 // Page represents a page of data in a file.
 type Page [PageSize]byte
@@ -79,16 +84,6 @@ func slotEntryToRecordAddress(offset slotEntry) RecordAddress {
 func (s slotEntry) isForwardedAddress() bool {
 	return s>>48 == 0xffff
 }
-
-/*
- * First two bytes of the page store the number of slots in the page.
- * The next two bytes store an offset to the free space on the page.
- * After that is an array of slot entries. Each slot entry is 8 bytes and stores the byte offset or
- * the forwarded database address of a record.
- * The slot array is followed by the free space on the page.
- * The records are stored in reverse order on the page. The first record is stored at the end of
- * the page. The next record is stored before the first record and so on.
- */
 
 // setNumSlots sets the number of slots in the page.
 func (p *Page) setNumSlots(numSlots uint16) {
