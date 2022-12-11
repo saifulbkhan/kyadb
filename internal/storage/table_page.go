@@ -6,6 +6,7 @@ import (
 )
 
 /*
+ * This file contains the implementation of the TablePage type.
  * First two bytes of the page store the number of slots in the page.
  * The next two bytes store an offset to the free space on the page.
  * After that is an array of slot entries. Each slot entry is 8 bytes and stores the byte offset or
@@ -15,16 +16,7 @@ import (
  * the page. The next record is stored before the first record and so on.
  */
 
-const PageSize = 8 * 1024
-
-// Page represents a page of data in a file.
-type Page [PageSize]byte
-
-// PageAddress is a unique identifier for a page in a file.
-type PageAddress struct {
-	FileID  uint16
-	PageNum uint32
-}
+type TablePage Page
 
 // RecordAddress represents the database address of a record. It is a combination of a record's page
 // address and the slot number that stores the slotEntry for the record.
@@ -33,32 +25,21 @@ type RecordAddress struct {
 	SlotNum uint16
 }
 
-// slotEntry can store the offset of a record within a page or the forwarded address of the
-// record within a file. The first 2 bytes represent the file number and the next 4 bytes represent
-// the page number. The last 4 bytes represent the slot number or the record's offset within the
-// page.
-type slotEntry uint64
-
-// PageFullError is returned when an operation cannot be completed because the page is full.
-type PageFullError struct {
-	available uint16
-	needed    uint16
-}
-
 // RecordDeletedError is returned when a record is not present at the expected slot number.
 type RecordDeletedError struct {
 	SlotNum uint16
 }
 
-func (e *PageFullError) Error() string {
-	return fmt.Sprintf(
-		"operation cannot be completed, page full: available=%d, needed=%d", e.available, e.needed,
-	)
-}
-
 func (e *RecordDeletedError) Error() string {
 	return fmt.Sprintf("record at slot=%d has been deleted", e.SlotNum)
 }
+
+// slotEntry is the value stored in each slot of a TablePage. It can store the offset of a record
+// within a page or the forwarded address of the record within a file. The first 2 bytes represent
+// the file number and the next 4 bytes represent the page number. The last 4 bytes represent the
+// slot number or the record's offset within the page. If the slotEntry value is zero ( all bytes
+// are 0), then the record has been deleted.
+type slotEntry uint64
 
 // recordAddressToSlotEntry casts a RecordAddress to a slotEntry.
 func recordAddressToSlotEntry(addr RecordAddress) slotEntry {
@@ -86,52 +67,52 @@ func (s slotEntry) isForwardedAddress() bool {
 }
 
 // setNumSlots sets the number of slots in the page.
-func (p *Page) setNumSlots(numSlots uint16) {
+func (p *TablePage) setNumSlots(numSlots uint16) {
 	binary.LittleEndian.PutUint16(p[:2], numSlots)
 }
 
 // getNumSlots returns the number of slots in the page.
-func (p *Page) getNumSlots() uint16 {
+func (p *TablePage) getNumSlots() uint16 {
 	return binary.LittleEndian.Uint16(p[:2])
 }
 
 // setFreeOffset sets the offset to the free space on the page.
-func (p *Page) setFreeOffset(offset uint16) {
+func (p *TablePage) setFreeOffset(offset uint16) {
 	binary.LittleEndian.PutUint16(p[2:4], offset)
 }
 
 // getFreeOffset returns the offset to the free space on the page.
-func (p *Page) getFreeOffset() uint16 {
+func (p *TablePage) getFreeOffset() uint16 {
 	return binary.LittleEndian.Uint16(p[2:4])
 }
 
 // addSlot adds a slot entry to the page.
-func (p *Page) addSlot(slot slotEntry) {
+func (p *TablePage) addSlot(slot slotEntry) {
 	numSlots := p.getNumSlots()
 	binary.LittleEndian.PutUint64(p[4+8*numSlots:], uint64(slot))
 	p.setNumSlots(numSlots + 1)
 }
 
 // setSlot sets the slot entry at the given slot number.
-func (p *Page) setSlot(slotNum uint16, slot slotEntry) {
+func (p *TablePage) setSlot(slotNum uint16, slot slotEntry) {
 	binary.LittleEndian.PutUint64(p[4+8*slotNum:], uint64(slot))
 }
 
 // getSlot returns the slot entry at the given number.
-func (p *Page) getSlot(slotNum uint16) slotEntry {
+func (p *TablePage) getSlot(slotNum uint16) slotEntry {
 	return slotEntry(binary.LittleEndian.Uint64(p[4+8*slotNum:]))
 }
 
-// NewPage returns a new page.
-func NewPage() *Page {
-	p := &Page{}
+// NewTablePage returns a new page meant for storing table records.
+func NewTablePage() *TablePage {
+	p := &TablePage{}
 	p.setNumSlots(0)
 	p.setFreeOffset(PageSize)
 	return p
 }
 
 // AddRecord adds a record to the page. It returns the slot number of the record.
-func (p *Page) AddRecord(record *Record) (uint16, error) {
+func (p *TablePage) AddRecord(record *Record) (uint16, error) {
 	// Get the free offset.
 	offset := p.getFreeOffset()
 
@@ -146,8 +127,8 @@ func (p *Page) AddRecord(record *Record) (uint16, error) {
 	newHeaderEnd := headerLength + 8
 	if newOffset < newHeaderEnd {
 		return 0, &PageFullError{
-			available: offset - newHeaderEnd,
-			needed:    record.Length(),
+			Available: offset - newHeaderEnd,
+			Needed:    record.Length(),
 		}
 	}
 
@@ -170,7 +151,7 @@ func (p *Page) AddRecord(record *Record) (uint16, error) {
 // value is set to a non-nil address value instead.
 //
 // If the record has been deleted then RecordDeletedError is returned.
-func (p *Page) GetRecord(slotNum uint16) (*Record, *RecordAddress, error) {
+func (p *TablePage) GetRecord(slotNum uint16) (*Record, *RecordAddress, error) {
 	// Get the slot entry value.
 	entry := p.getSlot(slotNum)
 
@@ -192,7 +173,7 @@ func (p *Page) GetRecord(slotNum uint16) (*Record, *RecordAddress, error) {
 }
 
 // SetForwardedAddress sets the slot entry to a forwarded address.
-func (p *Page) SetForwardedAddress(slotNum uint16, addr RecordAddress) {
+func (p *TablePage) SetForwardedAddress(slotNum uint16, addr RecordAddress) {
 	p.setSlot(slotNum, recordAddressToSlotEntry(addr))
 }
 
@@ -208,7 +189,7 @@ func (p *Page) SetForwardedAddress(slotNum uint16, addr RecordAddress) {
 // PageFullError is returned the record is not updated. It is the caller's responsibility to add the
 // updated record to a new page and update the record's slot entry to its new address on this page
 // using the SetForwardedAddress method.
-func (p *Page) UpdateRecord(slotNum uint16, record *Record) (*RecordAddress, error) {
+func (p *TablePage) UpdateRecord(slotNum uint16, record *Record) (*RecordAddress, error) {
 	// Get the slot entry value.
 	entry := p.getSlot(slotNum)
 
@@ -237,8 +218,8 @@ func (p *Page) UpdateRecord(slotNum uint16, record *Record) (*RecordAddress, err
 		newHeaderEnd := headerLength + 8
 		if newOffset < newHeaderEnd {
 			return nil, &PageFullError{
-				available: offset - newHeaderEnd,
-				needed:    record.Length(),
+				Available: offset - newHeaderEnd,
+				Needed:    record.Length(),
 			}
 		}
 
@@ -250,6 +231,6 @@ func (p *Page) UpdateRecord(slotNum uint16, record *Record) (*RecordAddress, err
 	return nil, nil
 }
 
-func (p *Page) DeleteRecord(slotNum uint16) {
+func (p *TablePage) DeleteRecord(slotNum uint16) {
 	p.setSlot(slotNum, 0)
 }

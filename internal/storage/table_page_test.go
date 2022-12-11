@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestPage_AddRecord(t *testing.T) {
+func TestTablePage_AddRecord(t *testing.T) {
 	t.Run(
 		"check addition of three records", func(t *testing.T) {
 			r1 := NewRecord(2)
@@ -34,7 +34,7 @@ func TestPage_AddRecord(t *testing.T) {
 				t.Error(err)
 			}
 
-			page := NewPage()
+			page := NewTablePage()
 			slot, err := page.AddRecord(r1)
 			if err != nil {
 				t.Error(err)
@@ -64,7 +64,7 @@ func TestPage_AddRecord(t *testing.T) {
 
 	t.Run(
 		"check page full error", func(t *testing.T) {
-			page := NewPage()
+			page := NewTablePage()
 
 			// The following record is 24 bytes long.
 			r := NewRecord(1)
@@ -91,7 +91,7 @@ func TestPage_AddRecord(t *testing.T) {
 	)
 }
 
-func TestPage_GetRecord(t *testing.T) {
+func TestTablePage_GetRecord(t *testing.T) {
 	t.Run(
 		"check retrieval of three records", func(t *testing.T) {
 			r1 := NewRecord(2)
@@ -120,7 +120,7 @@ func TestPage_GetRecord(t *testing.T) {
 				t.Error(err)
 			}
 
-			page := NewPage()
+			page := NewTablePage()
 			_, err = page.AddRecord(r1)
 			if err != nil {
 				t.Error(err)
@@ -160,13 +160,13 @@ func TestPage_GetRecord(t *testing.T) {
 	)
 }
 
-func TestPage_SetForwardedAddress(t *testing.T) {
+func TestTablePage_SetForwardedAddress(t *testing.T) {
 	t.Run(
 		"check setting of forwarded address", func(t *testing.T) {
 			record := NewRecord(4)
 			record.SetUint32(0, 2048)
 
-			page := NewPage()
+			page := NewTablePage()
 			slotNum, err := page.AddRecord(record)
 			if err != nil {
 				return
@@ -181,7 +181,7 @@ func TestPage_SetForwardedAddress(t *testing.T) {
 	)
 }
 
-func TestPage_UpdateRecord(t *testing.T) {
+func TestTablePage_UpdateRecord(t *testing.T) {
 	t.Run(
 		"check updating of record", func(t *testing.T) {
 			r1 := NewRecord(2)
@@ -211,7 +211,7 @@ func TestPage_UpdateRecord(t *testing.T) {
 				t.Error(err)
 			}
 
-			page := NewPage()
+			page := NewTablePage()
 			slotNum1, err := page.AddRecord(r1)
 			if err != nil {
 				t.Error(err)
@@ -308,7 +308,7 @@ func TestPage_UpdateRecord(t *testing.T) {
 				t.Error(err)
 			}
 
-			page := NewPage()
+			page := NewTablePage()
 			_, err = page.AddRecord(r1)
 			if err != nil {
 				t.Error(err)
@@ -357,7 +357,7 @@ func TestPage_UpdateRecord(t *testing.T) {
 
 	t.Run(
 		"check page full error", func(t *testing.T) {
-			page := NewPage()
+			page := NewTablePage()
 
 			// The following record is 24 bytes long.
 			r := NewRecord(1)
@@ -398,10 +398,10 @@ func TestPage_UpdateRecord(t *testing.T) {
 	)
 }
 
-func TestPage_DeleteRecord(t *testing.T) {
+func TestTablePage_DeleteRecord(t *testing.T) {
 	t.Run(
 		"check deletion of records", func(t *testing.T) {
-			page := NewPage()
+			page := NewTablePage()
 
 			r1 := NewRecord(2)
 			r1.SetUint32(0, 1024)
