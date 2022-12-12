@@ -98,6 +98,42 @@ func NameForElementType(elemType ElementType) (string, error) {
 	return elemTypeName, err
 }
 
+func ElementTypeForValue(value any) (ElementType, error) {
+	var elemType ElementType
+	var err error
+	switch value.(type) {
+	case bool:
+		elemType = BoolType
+	case uint32:
+		elemType = Uint32Type
+	case uint64:
+		elemType = Uint64Type
+	case int32:
+		elemType = Int32Type
+	case int64:
+		elemType = Int64Type
+	case float32:
+		elemType = Float32Type
+	case float64:
+		elemType = Float64Type
+	case string:
+		elemType = StringType
+	case time.Time:
+		elemType = TimeType
+	case Array:
+		elemType = ArrayType
+	case Map:
+		elemType = MapType
+	default:
+		err = fmt.Errorf("unsupported type %T", value)
+	}
+	return elemType, err
+}
+
+func IsPrimitiveElementType(elemType ElementType) bool {
+	return elemType != NullType && elemType != ArrayType && elemType != MapType
+}
+
 func BytesNeededForString(str string) uint16 {
 	return uint16(len(str)) + 2
 }

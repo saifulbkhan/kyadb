@@ -59,8 +59,8 @@ func slotEntryToRecordAddress(offset slotEntry) RecordAddress {
 	}
 }
 
-// isForwardedAddress returns true if a slotEntry represents a forwarded address. If the first two bytes
-// are max uint16, then the slot entry is a not a forwarded address. We use max uint16 because
+// isForwardedAddress returns true if a slotEntry represents a forwarded address. If the first two
+// bytes are max uint16, then the slot entry is a not a forwarded address. We use max uint16 because
 // the file ID is stored as uint16, but no file ID is ever max uint16.
 func (s slotEntry) isForwardedAddress() bool {
 	return s>>48 == 0xffff
