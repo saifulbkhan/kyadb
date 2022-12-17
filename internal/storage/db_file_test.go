@@ -9,7 +9,7 @@ import (
 func TestNewFile(t *testing.T) {
 	t.Run(
 		"check basic file creation", func(t *testing.T) {
-			file, err := NewFile("test", 1)
+			dbFile, err := NewFile("test", 1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -22,23 +22,23 @@ func TestNewFile(t *testing.T) {
 				if err != nil {
 					t.Error(err)
 				}
-			}(file)
+			}(dbFile.file)
 
 			home, err := os.UserHomeDir()
 			if err != nil {
 				t.Error(err)
 			}
 			want := fmt.Sprintf("%s/.var/lib/kyadb/base/test/1", home)
-			got := file.Name()
+			got := dbFile.file.Name()
 			if got != want {
 				t.Errorf("got %s, want %s", got, want)
 			}
 
-			stat, err := file.Stat()
+			stat, err := dbFile.file.Stat()
 			if err != nil {
 				t.Error(err)
 			}
-			wantSize := int64(8)
+			wantSize := int64(6)
 			gotSize := stat.Size()
 			if gotSize != wantSize {
 				t.Errorf("got %d, want %d", gotSize, wantSize)
@@ -50,23 +50,23 @@ func TestNewFile(t *testing.T) {
 func TestOpenFile(t *testing.T) {
 	t.Run(
 		"check basic file opening", func(t *testing.T) {
-			file, err := NewFile("test", 1)
+			dbFile, err := NewFile("test", 1)
 			if err != nil {
 				t.Error(err)
 			}
-			wantName := file.Name()
-			stat, err := file.Stat()
+			wantName := dbFile.file.Name()
+			stat, err := dbFile.file.Stat()
 			if err != nil {
 				t.Error(err)
 			}
 			wantSize := stat.Size()
 
-			err = file.Close()
+			err = dbFile.file.Close()
 			if err != nil {
 				t.Error(err)
 			}
 
-			file, err = OpenFile("test", 1)
+			dbFile, err = OpenFile("test", 1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -79,14 +79,14 @@ func TestOpenFile(t *testing.T) {
 				if err != nil {
 					t.Error(err)
 				}
-			}(file)
+			}(dbFile.file)
 
-			gotName := file.Name()
+			gotName := dbFile.file.Name()
 			if gotName != wantName {
 				t.Errorf("got %s, want %s", gotName, wantName)
 			}
 
-			stat, err = file.Stat()
+			stat, err = dbFile.file.Stat()
 			if err != nil {
 				t.Error(err)
 			}
@@ -101,11 +101,11 @@ func TestOpenFile(t *testing.T) {
 func TestDeleteFile(t *testing.T) {
 	t.Run(
 		"check basic file deletion", func(t *testing.T) {
-			file, err := NewFile("test", 1)
+			dbFile, err := NewFile("test", 1)
 			if err != nil {
 				t.Error(err)
 			}
-			err = file.Close()
+			err = dbFile.file.Close()
 			if err != nil {
 				t.Error(err)
 			}
@@ -121,7 +121,7 @@ func TestDeleteFile(t *testing.T) {
 			}
 			filePath := fmt.Sprintf("%s/.var/lib/kyadb/base/test/1", home)
 			if _, err := os.Stat(filePath); !os.IsNotExist(err) {
-				t.Errorf("file %s still exists", filePath)
+				t.Errorf("DB file %s still exists", filePath)
 			}
 		},
 	)

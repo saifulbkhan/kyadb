@@ -8,7 +8,7 @@ import (
 
 /*
  * Files represent files in a database. Each file is a collection of pages.
- * The first 8 bytes are the file's header. The first 4 bytes in the header are the file's ID. The
+ * The first 6 bytes are the file's header. The first 2 bytes in the header are the file's ID. The
  * next 4 bytes are the number of pages in the file.
  * This is followed by the pages containing records.
  * A separate file will be maintained per table which will store the free space capacity of each
@@ -19,13 +19,24 @@ const (
 	VarDir          = ".var"           // TODO: make this configurable
 	BaseStoragePath = "lib/kyadb/base" // TODO: make this configurable
 	MaxPagesPerFile = 256 * 1024
-	MaxFileSize     = 8 + PageSize*MaxPagesPerFile // ~2GB
 	defaultFilePerm = 0644
 )
 
+type DatabaseFile struct {
+	file     *os.File
+	FileId   uint16
+	NumPages uint32
+}
+
+type FileFullError struct{}
+
+func (e *FileFullError) Error() string {
+	return fmt.Sprintf("file is full, maximum number of pages allowed: %d", MaxPagesPerFile)
+}
+
 // dbFilePath returns the path to the database file on disk. It may return an error if the directory
 // path cannot be determined.
-func dbFilePath(tableName string, fileID uint32) (string, error) {
+func dbFilePath(tableName string, fileID uint16) (string, error) {
 	// TODO: data should not be in user's home directory, fine for MVP
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -35,39 +46,18 @@ func dbFilePath(tableName string, fileID uint32) (string, error) {
 	return dbFilePath, nil
 }
 
-// writeHeader writes the file header to the given file.
-func writeHeader(file *os.File, fileID uint32, numPages uint32, sync bool) error {
-	var header Bytes = make([]byte, 8)
-	WriteUint32(&header, 0, fileID)
-	WriteUint32(&header, 4, numPages)
-	if _, err := file.WriteAt(header, 0); err != nil {
-		return err
-	}
-	if sync {
-		if err := file.Sync(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// writeNumPages writes the number of pages in the file to the file header.
-func writeNumPages(file *os.File, numPages uint32, sync bool) error {
+// readNumPages reads the number of pages in the file from the file header.
+func (dbFile *DatabaseFile) readNumPages() error {
 	var b Bytes = make([]byte, 4)
-	WriteUint32(&b, 0, numPages)
-	if _, err := file.WriteAt(b, 4); err != nil {
+	if _, err := dbFile.file.ReadAt(b, 2); err != nil {
 		return err
 	}
-	if sync {
-		if err := file.Sync(); err != nil {
-			return err
-		}
-	}
+	dbFile.NumPages = ReadUint32(&b, 0)
 	return nil
 }
 
 // NewFile creates a new database file on disk, with the given table name and file ID.
-func NewFile(tableName string, fileID uint32) (*os.File, error) {
+func NewFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	dbFilePath, err := dbFilePath(tableName, fileID)
 	if err != nil {
 		return nil, err
@@ -81,25 +71,48 @@ func NewFile(tableName string, fileID uint32) (*os.File, error) {
 		return nil, err
 	}
 
-	err = writeHeader(file, fileID, 0, true)
+	dbFile := &DatabaseFile{file, fileID, 0}
+	err = dbFile.MakeDurable()
 	if err != nil {
 		return nil, err
 	}
 
-	return file, nil
+	return dbFile, nil
+}
+
+// MakeDurable commits the current contents of the file to stable storage.
+func (dbFile *DatabaseFile) MakeDurable() error {
+	var header Bytes = make([]byte, 6)
+	WriteUint16(&header, 0, dbFile.FileId)
+	WriteUint32(&header, 2, dbFile.NumPages)
+	if _, err := dbFile.file.WriteAt(header, 0); err != nil {
+		return err
+	}
+	if err := dbFile.file.Sync(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // OpenFile opens an existing database file on disk, with the given table name and file ID.
-func OpenFile(tableName string, fileID uint32) (*os.File, error) {
+func OpenFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	dbFilePath, err := dbFilePath(tableName, fileID)
 	if err != nil {
 		return nil, err
 	}
-	return os.OpenFile(dbFilePath, os.O_RDWR, defaultFilePerm)
+	file, err := os.OpenFile(dbFilePath, os.O_RDWR, defaultFilePerm)
+	if err != nil {
+		return nil, err
+	}
+	dbFile := &DatabaseFile{file, fileID, 0}
+	if err = dbFile.readNumPages(); err != nil {
+		return nil, err
+	}
+	return dbFile, err
 }
 
 // DeleteFile deletes the database file on disk, with the given table name and file ID.
-func DeleteFile(tableName string, fileID uint32) error {
+func DeleteFile(tableName string, fileID uint16) error {
 	dbFilePath, err := dbFilePath(tableName, fileID)
 	if err != nil {
 		return err
@@ -114,4 +127,3 @@ func DeleteFile(tableName string, fileID uint32) error {
 // 4. Read one or more pages from a file (pread).
 // 3. Make all writes to a file durable (fsync).
 // 2. Write a page to a file (pwrite).
-// 1. Append a page to a file.

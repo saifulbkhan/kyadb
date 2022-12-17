@@ -191,6 +191,11 @@ func BytesNeededForMap(m Map) (uint16, error) {
 	return bytesNeeded + 4, err
 }
 
+func WriteUint16(b *Bytes, offset uint16, value uint16) {
+	(*b)[offset] = byte(value)
+	(*b)[offset+1] = byte(value >> 8)
+}
+
 func WriteUint32(b *Bytes, offset uint16, value uint32) {
 	(*b)[offset] = byte(value)
 	(*b)[offset+1] = byte(value >> 8)
@@ -362,6 +367,10 @@ func WriteMap(b *Bytes, offset uint16, m Map) (uint16, error) {
 		}
 	}
 	return newOffset, nil
+}
+
+func ReadUint16(b *Bytes, offset uint16) uint16 {
+	return binary.LittleEndian.Uint16((*b)[offset : offset+2])
 }
 
 func ReadUint32(b *Bytes, offset uint16) uint32 {
