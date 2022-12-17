@@ -17,14 +17,13 @@ import (
 
 const (
 	VarDir          = ".var"           // TODO: make this configurable
-	BaseStoragePath = "lib/kyadb/data" // TODO: make this configurable
+	BaseStoragePath = "lib/kyadb/base" // TODO: make this configurable
 	MaxPagesPerFile = 256 * 1024
 	MaxFileSize     = 8 + PageSize*MaxPagesPerFile // ~2GB
+	defaultFilePerm = 0644
 )
 
 // We need the following functions:
-// 1. Create a new file.
-// 2. Open an existing file for read/write.
 // 3. Append a page to a file.
 // 4. Write a page to a file (pwrite).
 // 5. Make all writes to a file durable (fsync).
@@ -33,6 +32,18 @@ const (
 // 8. Get the number of pages in a file.
 // 9. Get the file ID of a file.
 // 10. Delete a file from disk.
+
+// dbFilePath returns the path to the database file on disk. It may return an error if the directory
+// path cannot be determined.
+func dbFilePath(tableName string, fileID uint32) (string, error) {
+	// TODO: data should not be in user's home directory, fine for MVP
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dbFilePath := fmt.Sprintf("%s/%s/%s/%s/%d", home, VarDir, BaseStoragePath, tableName, fileID)
+	return dbFilePath, nil
+}
 
 // writeHeader writes the file header to the given file.
 func writeHeader(file *os.File, fileID uint32, numPages uint32, sync bool) error {
@@ -67,16 +78,15 @@ func writeNumPages(file *os.File, numPages uint32, sync bool) error {
 
 // NewFile creates a new database file on disk, with the given table name and file ID.
 func NewFile(tableName string, fileID uint32) (*os.File, error) {
-	// TODO: data should not be in user's home directory, fine for MVP
-	home, err := os.UserHomeDir()
+	dbFilePath, err := dbFilePath(tableName, fileID)
 	if err != nil {
 		return nil, err
 	}
-	dbFilePath := fmt.Sprintf("%s/%s/%s/%s/%d", home, VarDir, BaseStoragePath, tableName, fileID)
-	if err := os.MkdirAll(filepath.Dir(dbFilePath), 0744); err != nil {
+	parentDir := filepath.Dir(dbFilePath)
+	if err := os.MkdirAll(parentDir, 0744); err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(dbFilePath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
+	file, err := os.OpenFile(dbFilePath, os.O_CREATE|os.O_EXCL|os.O_RDWR, defaultFilePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -87,4 +97,13 @@ func NewFile(tableName string, fileID uint32) (*os.File, error) {
 	}
 
 	return file, nil
+}
+
+// OpenFile opens an existing database file on disk, with the given table name and file ID.
+func OpenFile(tableName string, fileID uint32) (*os.File, error) {
+	dbFilePath, err := dbFilePath(tableName, fileID)
+	if err != nil {
+		return nil, err
+	}
+	return os.OpenFile(dbFilePath, os.O_RDWR, defaultFilePerm)
 }
