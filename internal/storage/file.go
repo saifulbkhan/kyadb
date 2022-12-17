@@ -23,16 +23,6 @@ const (
 	defaultFilePerm = 0644
 )
 
-// We need the following functions:
-// 3. Append a page to a file.
-// 4. Write a page to a file (pwrite).
-// 5. Make all writes to a file durable (fsync).
-// 6. Read one or more pages from a file (pread).
-// 7. Delete (clear) a page from a file.
-// 8. Get the number of pages in a file.
-// 9. Get the file ID of a file.
-// 10. Delete a file from disk.
-
 // dbFilePath returns the path to the database file on disk. It may return an error if the directory
 // path cannot be determined.
 func dbFilePath(tableName string, fileID uint32) (string, error) {
@@ -107,3 +97,21 @@ func OpenFile(tableName string, fileID uint32) (*os.File, error) {
 	}
 	return os.OpenFile(dbFilePath, os.O_RDWR, defaultFilePerm)
 }
+
+// DeleteFile deletes the database file on disk, with the given table name and file ID.
+func DeleteFile(tableName string, fileID uint32) error {
+	dbFilePath, err := dbFilePath(tableName, fileID)
+	if err != nil {
+		return err
+	}
+	return os.Remove(dbFilePath)
+}
+
+// We need the following functions:
+// 7. Get the file ID of a file.
+// 6. Get the number of pages in a file.
+// 5. Delete (clear) a page from a file.
+// 4. Read one or more pages from a file (pread).
+// 3. Make all writes to a file durable (fsync).
+// 2. Write a page to a file (pwrite).
+// 1. Append a page to a file.

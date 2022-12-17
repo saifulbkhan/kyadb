@@ -97,3 +97,32 @@ func TestOpenFile(t *testing.T) {
 		},
 	)
 }
+
+func TestDeleteFile(t *testing.T) {
+	t.Run(
+		"check basic file deletion", func(t *testing.T) {
+			file, err := NewFile("test", 1)
+			if err != nil {
+				t.Error(err)
+			}
+			err = file.Close()
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = DeleteFile("test", 1)
+			if err != nil {
+				t.Error(err)
+			}
+
+			home, err := os.UserHomeDir()
+			if err != nil {
+				t.Error(err)
+			}
+			filePath := fmt.Sprintf("%s/.var/lib/kyadb/base/test/1", home)
+			if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+				t.Errorf("file %s still exists", filePath)
+			}
+		},
+	)
+}
