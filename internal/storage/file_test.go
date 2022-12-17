@@ -36,7 +36,7 @@ func TestFile_NewFile(t *testing.T) {
 			}
 			wantSize := int64(8)
 			gotSize := stat.Size()
-			if got != want {
+			if gotSize != wantSize {
 				t.Errorf("got %d, want %d", gotSize, wantSize)
 			}
 

@@ -16,6 +16,7 @@ import (
  */
 
 const (
+	VarDir          = ".var"           // TODO: make this configurable
 	BaseStoragePath = "lib/kyadb/data" // TODO: make this configurable
 	MaxPagesPerFile = 256 * 1024
 	MaxFileSize     = 8 + PageSize*MaxPagesPerFile // ~2GB
@@ -33,18 +34,57 @@ const (
 // 9. Get the file ID of a file.
 // 10. Delete a file from disk.
 
+// writeHeader writes the file header to the given file.
+func writeHeader(file *os.File, fileID uint32, numPages uint32, sync bool) error {
+	var header Bytes = make([]byte, 8)
+	WriteUint32(&header, 0, fileID)
+	WriteUint32(&header, 4, numPages)
+	if _, err := file.WriteAt(header, 0); err != nil {
+		return err
+	}
+	if sync {
+		if err := file.Sync(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// writeNumPages writes the number of pages in the file to the file header.
+func writeNumPages(file *os.File, numPages uint32, sync bool) error {
+	var b Bytes = make([]byte, 4)
+	WriteUint32(&b, 0, numPages)
+	if _, err := file.WriteAt(b, 4); err != nil {
+		return err
+	}
+	if sync {
+		if err := file.Sync(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // NewFile creates a new database file on disk, with the given table name and file ID.
-func NewFile(tableName string, fileID uint16) (*os.File, error) {
+func NewFile(tableName string, fileID uint32) (*os.File, error) {
 	// TODO: data should not be in user's home directory, fine for MVP
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
-	dbFilePath := fmt.Sprintf("%s/.var/%s/%s/%d", home, BaseStoragePath, tableName, fileID)
+	dbFilePath := fmt.Sprintf("%s/%s/%s/%s/%d", home, VarDir, BaseStoragePath, tableName, fileID)
 	if err := os.MkdirAll(filepath.Dir(dbFilePath), 0744); err != nil {
 		return nil, err
 	}
-	return os.OpenFile(dbFilePath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
+	file, err := os.OpenFile(dbFilePath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
+	if err != nil {
+		return nil, err
+	}
 
-	// TODO: Write the file header.
+	err = writeHeader(file, fileID, 0, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return file, nil
 }
