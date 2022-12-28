@@ -135,10 +135,19 @@ func (dbFile *DatabaseFile) AppendPage(page *Page) (uint32, error) {
 	return dbFile.NumPages - 1, nil
 }
 
+// WritePage writes a page to the given page number in the file. It returns a pointer to an error,
+// if any.
+func (dbFile *DatabaseFile) WritePage(page *Page, pageNum uint32) error {
+	offset := 6 + pageNum*PageSize
+	if _, err := dbFile.file.WriteAt(page[:], int64(offset)); err != nil {
+		return err
+	}
+	return nil
+}
+
 // We need the following functions:
 // 7. Get the file ID of a file.
 // 6. Get the number of pages in a file.
 // 5. Delete (clear) a page from a file.
 // 4. Read one or more pages from a file (pread).
 // 3. Make all writes to a file durable (fsync).
-// 2. Write a page to a file (pwrite).
