@@ -126,3 +126,82 @@ func TestDeleteFile(t *testing.T) {
 		},
 	)
 }
+
+func TestDatabaseFile_AppendPage(t *testing.T) {
+	t.Run(
+		"check basic page appending", func(t *testing.T) {
+			dbFile, err := NewFile("test", 1)
+			if err != nil {
+				t.Error(err)
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				err = os.Remove(file.Name())
+				if err != nil {
+					t.Error(err)
+				}
+			}(dbFile.file)
+
+			page := NewTablePage()
+
+			_, err = dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+
+			stat, err := dbFile.file.Stat()
+			if err != nil {
+				t.Error(err)
+			}
+			wantSize := int64(6 + PageSize)
+			gotSize := stat.Size()
+			if gotSize != wantSize {
+				t.Errorf("got %d, want %d", gotSize, wantSize)
+			}
+		},
+	)
+
+	t.Run(
+		"check page appending with offset", func(t *testing.T) {
+			dbFile, err := NewFile("test", 1)
+			if err != nil {
+				t.Error(err)
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				err = os.Remove(file.Name())
+				if err != nil {
+					t.Error(err)
+				}
+			}(dbFile.file)
+
+			page := NewTablePage()
+
+			_, err = dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+
+			stat, err := dbFile.file.Stat()
+			if err != nil {
+				t.Error(err)
+			}
+			wantSize := int64(6 + 2*PageSize)
+			gotSize := stat.Size()
+			if gotSize != wantSize {
+				t.Errorf("got %d, want %d", gotSize, wantSize)
+			}
+		},
+	)
+}

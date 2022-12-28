@@ -46,9 +46,9 @@ func dbFilePath(tableName string, fileID uint16) (string, error) {
 	return dbFilePath, nil
 }
 
-// readNumPages reads the number of pages in the file from the file header.
-func (dbFile *DatabaseFile) readNumPages() error {
-	var b Bytes = make([]byte, 4)
+// loadNumPages reads the number of pages in the file from the file header.
+func (dbFile *DatabaseFile) loadNumPages() error {
+	var b = make([]byte, 4)
 	if _, err := dbFile.file.ReadAt(b, 2); err != nil {
 		return err
 	}
@@ -80,20 +80,6 @@ func NewFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	return dbFile, nil
 }
 
-// MakeDurable commits the current contents of the file to stable storage.
-func (dbFile *DatabaseFile) MakeDurable() error {
-	var header Bytes = make([]byte, 6)
-	WriteUint16(&header, 0, dbFile.FileId)
-	WriteUint32(&header, 2, dbFile.NumPages)
-	if _, err := dbFile.file.WriteAt(header, 0); err != nil {
-		return err
-	}
-	if err := dbFile.file.Sync(); err != nil {
-		return err
-	}
-	return nil
-}
-
 // OpenFile opens an existing database file on disk, with the given table name and file ID.
 func OpenFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	dbFilePath, err := dbFilePath(tableName, fileID)
@@ -105,7 +91,7 @@ func OpenFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 		return nil, err
 	}
 	dbFile := &DatabaseFile{file, fileID, 0}
-	if err = dbFile.readNumPages(); err != nil {
+	if err = dbFile.loadNumPages(); err != nil {
 		return nil, err
 	}
 	return dbFile, err
@@ -118,6 +104,35 @@ func DeleteFile(tableName string, fileID uint16) error {
 		return err
 	}
 	return os.Remove(dbFilePath)
+}
+
+// MakeDurable commits the current contents of the file to stable storage.
+func (dbFile *DatabaseFile) MakeDurable() error {
+	var header = make([]byte, 6)
+	WriteUint16(&header, 0, dbFile.FileId)
+	WriteUint32(&header, 2, dbFile.NumPages)
+	if _, err := dbFile.file.WriteAt(header, 0); err != nil {
+		return err
+	}
+	if err := dbFile.file.Sync(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AppendPage adds a new page to the end of the file. It returns the page number of the newly added
+// page and pointer to an error, if any.
+func (dbFile *DatabaseFile) AppendPage(page *Page) (uint32, error) {
+	if dbFile.NumPages == MaxPagesPerFile {
+		return 0xffff, &FileFullError{}
+	}
+
+	offset := 6 + dbFile.NumPages*PageSize
+	if _, err := dbFile.file.WriteAt(page[:], int64(offset)); err != nil {
+		return 0xffff, err
+	}
+	dbFile.NumPages++
+	return dbFile.NumPages - 1, nil
 }
 
 // We need the following functions:
