@@ -145,9 +145,17 @@ func (dbFile *DatabaseFile) WritePage(page *Page, pageNum uint32) error {
 	return nil
 }
 
-// We need the following functions:
-// 7. Get the file ID of a file.
-// 6. Get the number of pages in a file.
-// 5. Delete (clear) a page from a file.
-// 4. Read one or more pages from a file (pread).
-// 3. Make all writes to a file durable (fsync).
+// ReadPages reads a range of pages from the file. It returns a pointer to an error, if any.
+func (dbFile *DatabaseFile) ReadPages(pageNum uint32, numPages uint32) (*[]Page, error) {
+	offset := 6 + pageNum*PageSize
+	pages := make([]Page, numPages)
+	for i := 0; i < int(numPages); i++ {
+		if _, err := dbFile.file.ReadAt(pages[i][:], int64(offset)); err != nil {
+			return nil, err
+		}
+		offset += PageSize
+	}
+	return &pages, nil
+}
+
+// TODO: Method to delete (clear) a page from a file.

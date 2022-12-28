@@ -182,7 +182,6 @@ func TestDatabaseFile_AppendPage(t *testing.T) {
 			}(dbFile.file)
 
 			page := NewTablePage()
-
 			_, err = dbFile.AppendPage(page)
 			if err != nil {
 				t.Error(err)
@@ -225,7 +224,6 @@ func TestDatabaseFile_WritePage(t *testing.T) {
 			}(dbFile.file)
 
 			page := NewTablePage()
-
 			pageNum, err := dbFile.AppendPage(page)
 			if err != nil {
 				t.Error(err)
@@ -245,6 +243,92 @@ func TestDatabaseFile_WritePage(t *testing.T) {
 			gotSize := stat.Size()
 			if gotSize != wantSize {
 				t.Errorf("got %d, want %d", gotSize, wantSize)
+			}
+		},
+	)
+}
+
+func TestDatabaseFile_ReadPages(t *testing.T) {
+	t.Run(
+		"check basic page reading", func(t *testing.T) {
+			dbFile, err := NewFile("test", 1)
+			if err != nil {
+				t.Error(err)
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				err = os.Remove(file.Name())
+				if err != nil {
+					t.Error(err)
+				}
+			}(dbFile.file)
+
+			page := NewTablePage()
+			pageNum, err := dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+
+			page = NewTablePage()
+			_, err = dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+			err = dbFile.MakeDurable()
+			if err != nil {
+				t.Error(err)
+			}
+
+			pages, err := dbFile.ReadPages(pageNum, 2)
+			if err != nil {
+				t.Error(err)
+			}
+
+			if len(*pages) != 2 {
+				t.Errorf("got %d, want %d", len(*pages), 2)
+			}
+		},
+	)
+
+	t.Run(
+		"check page reading beyond file size", func(t *testing.T) {
+			dbFile, err := NewFile("test", 1)
+			if err != nil {
+				t.Error(err)
+			}
+			defer func(file *os.File) {
+				err := file.Close()
+				if err != nil {
+					t.Error(err)
+				}
+				err = os.Remove(file.Name())
+				if err != nil {
+					t.Error(err)
+				}
+			}(dbFile.file)
+
+			page := NewTablePage()
+			pageNum, err := dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+
+			page = NewTablePage()
+			_, err = dbFile.AppendPage(page)
+			if err != nil {
+				t.Error(err)
+			}
+			err = dbFile.MakeDurable()
+			if err != nil {
+				t.Error(err)
+			}
+
+			_, err = dbFile.ReadPages(pageNum, 3)
+			if err == nil {
+				t.Error("expected error when reading more pages than written")
 			}
 		},
 	)
