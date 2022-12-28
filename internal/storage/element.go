@@ -22,8 +22,8 @@ const (
 	MapType     ElementType = 'm'
 )
 
-type Bytes []byte
-type ElementType byte
+type Bytes = []byte
+type ElementType = byte
 
 type Array struct {
 	ElementType ElementType
@@ -329,7 +329,7 @@ func WriteArray(b *Bytes, offset uint16, a Array) (uint16, error) {
 	newOffset++
 	(*b)[newOffset] = byte(len(a.Values) >> 8)
 	newOffset++
-	(*b)[newOffset] = byte(a.ElementType)
+	(*b)[newOffset] = a.ElementType
 	newOffset++
 	for _, value := range a.Values {
 		var err error
@@ -347,9 +347,9 @@ func WriteMap(b *Bytes, offset uint16, m Map) (uint16, error) {
 	newOffset++
 	(*b)[newOffset] = byte(len(m.Data) >> 8)
 	newOffset++
-	(*b)[newOffset] = byte(m.KeyType)
+	(*b)[newOffset] = m.KeyType
 	newOffset++
-	(*b)[newOffset] = byte(m.ValueType)
+	(*b)[newOffset] = m.ValueType
 	newOffset++
 	for key, value := range m.Data {
 		var err error
@@ -432,7 +432,7 @@ func ReadPrimitive(b *Bytes, offset uint16, expectedType ElementType) (any, uint
 func ReadArray(b *Bytes, offset uint16) (Array, uint16, error) {
 	arrayLen := binary.LittleEndian.Uint16((*b)[offset : offset+2])
 	offset += 2
-	elementType := ElementType((*b)[offset])
+	elementType := (*b)[offset]
 	offset++
 	a := Array{Values: make([]any, arrayLen), ElementType: elementType}
 	for i := uint16(0); i < arrayLen; i++ {
@@ -448,9 +448,9 @@ func ReadArray(b *Bytes, offset uint16) (Array, uint16, error) {
 func ReadMap(b *Bytes, offset uint16) (Map, uint16, error) {
 	mapLen := binary.LittleEndian.Uint16((*b)[offset : offset+2])
 	offset += 2
-	keyType := ElementType((*b)[offset])
+	keyType := (*b)[offset]
 	offset++
-	valueType := ElementType((*b)[offset])
+	valueType := (*b)[offset]
 	offset++
 	m := Map{Data: make(map[any]any), KeyType: keyType, ValueType: valueType}
 	for i := uint16(0); i < mapLen; i++ {

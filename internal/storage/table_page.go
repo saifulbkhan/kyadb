@@ -16,7 +16,7 @@ import (
  * the page. The next record is stored before the first record and so on.
  */
 
-type TablePage Page
+type TablePage = Page
 
 // RecordAddress represents the database address of a record. It is a combination of a record's page
 // address and the slot number that stores the slotEntry for the record.

@@ -8,7 +8,7 @@ import (
 )
 
 type Record Bytes
-type ElementPosition uint16
+type ElementPosition = uint16
 
 // WriteOverflowError is returned when there is not enough space in the record to write the given
 // Data.
@@ -221,7 +221,7 @@ func (r *Record) SetArray(position ElementPosition, a Array) error {
 		r.setOffset(position, offset)
 		r.setLength(offset + numBytes)
 	} else {
-		currentElementType := ElementType((*r)[offset+2])
+		currentElementType := (*r)[offset+2]
 		if currentElementType != a.ElementType {
 			return &TypeMismatchError{currentElementType, a.ElementType}
 		}
@@ -280,12 +280,12 @@ func (r *Record) SetMap(position ElementPosition, m Map) error {
 		r.setOffset(position, offset)
 		r.setLength(offset + numBytes)
 	} else {
-		currentKeyType := ElementType((*r)[offset+2])
+		currentKeyType := (*r)[offset+2]
 		if currentKeyType != m.KeyType {
 			err := &TypeMismatchError{currentKeyType, m.KeyType}
 			return fmt.Errorf("key type mismatch: %w", err)
 		}
-		currentValueType := ElementType((*r)[offset+3])
+		currentValueType := (*r)[offset+3]
 		if currentValueType != m.ValueType {
 			err := &TypeMismatchError{currentValueType, m.ValueType}
 			return fmt.Errorf("value type mismatch: %w", err)

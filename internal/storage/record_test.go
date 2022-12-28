@@ -518,7 +518,7 @@ func TestRecord_SetArray(t *testing.T) {
 
 			checkRecordLength(t, r, 9)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{0, 0, byte(Int32Type)})
+			checkRecordBytes(t, r, 6, []byte{0, 0, Int32Type})
 		},
 	)
 
@@ -532,7 +532,7 @@ func TestRecord_SetArray(t *testing.T) {
 
 			checkRecordLength(t, r, 13)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{1, 0, byte(Int32Type), 1, 0, 0, 0})
+			checkRecordBytes(t, r, 6, []byte{1, 0, Int32Type, 1, 0, 0, 0})
 		},
 	)
 
@@ -546,7 +546,7 @@ func TestRecord_SetArray(t *testing.T) {
 
 			checkRecordLength(t, r, 17)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{2, 0, byte(Int32Type), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, Int32Type, 1, 0, 0, 0, 2, 0, 0, 0})
 		},
 	)
 
@@ -574,8 +574,8 @@ func TestRecord_SetArray(t *testing.T) {
 
 			checkRecordLength(t, r, 30)
 			checkRecordBytes(t, r, 4, []byte{8, 0, 19, 0})
-			checkRecordBytes(t, r, 8, []byte{2, 0, byte(Int32Type), 1, 0, 0, 0, 2, 0, 0, 0})
-			checkRecordBytes(t, r, 19, []byte{2, 0, byte(Int32Type), 3, 0, 0, 0, 4, 0, 0, 0})
+			checkRecordBytes(t, r, 8, []byte{2, 0, Int32Type, 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 19, []byte{2, 0, Int32Type, 3, 0, 0, 0, 4, 0, 0, 0})
 		},
 	)
 
@@ -593,7 +593,7 @@ func TestRecord_SetArray(t *testing.T) {
 
 			checkRecordLength(t, r, 17)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{2, 0, byte(Int32Type), 3, 0, 0, 0, 4, 0, 0, 0})
+			checkRecordBytes(t, r, 6, []byte{2, 0, Int32Type, 3, 0, 0, 0, 4, 0, 0, 0})
 		},
 	)
 
@@ -625,7 +625,7 @@ func TestRecord_SetArray(t *testing.T) {
 
 			checkRecordLength(t, r, 26)
 			checkRecordBytes(t, r, 4, []byte{8, 0, 19, 0})
-			checkRecordBytes(t, r, 8, []byte{2, 0, byte(Int32Type), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 8, []byte{2, 0, Int32Type, 1, 0, 0, 0, 2, 0, 0, 0})
 			checkRecordBytes(t, r, 19, []byte{5, 0, 104, 101, 108, 108, 111})
 		},
 	)
@@ -645,7 +645,7 @@ func TestRecord_SetArray(t *testing.T) {
 			checkRecordLength(t, r, 26)
 			checkRecordBytes(t, r, 4, []byte{8, 0, 15, 0})
 			checkRecordBytes(t, r, 8, []byte{5, 0, 104, 101, 108, 108, 111})
-			checkRecordBytes(t, r, 15, []byte{2, 0, byte(Int32Type), 1, 0, 0, 0, 2, 0, 0, 0})
+			checkRecordBytes(t, r, 15, []byte{2, 0, Int32Type, 1, 0, 0, 0, 2, 0, 0, 0})
 		},
 	)
 
@@ -684,7 +684,7 @@ func TestRecord_SetMap(t *testing.T) {
 
 			checkRecordLength(t, r, 10)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{0, 0, byte(Int32Type), byte(Int32Type)})
+			checkRecordBytes(t, r, 6, []byte{0, 0, Int32Type, Int32Type})
 		},
 	)
 
@@ -699,7 +699,7 @@ func TestRecord_SetMap(t *testing.T) {
 			checkRecordLength(t, r, 18)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
 			checkRecordBytes(
-				t, r, 6, []byte{1, 0, byte(Int32Type), byte(Int32Type), 1, 0, 0, 0, 2, 0, 0, 0},
+				t, r, 6, []byte{1, 0, Int32Type, Int32Type, 1, 0, 0, 0, 2, 0, 0, 0},
 			)
 		},
 	)
@@ -714,7 +714,7 @@ func TestRecord_SetMap(t *testing.T) {
 
 			checkRecordLength(t, r, 26)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{2, 0, byte(Int32Type), byte(Int32Type)})
+			checkRecordBytes(t, r, 6, []byte{2, 0, Int32Type, Int32Type})
 			checkRecordBytesOneOf(
 				t, r, 10, [][]byte{
 					{
@@ -744,7 +744,7 @@ func TestRecord_SetMap(t *testing.T) {
 
 			checkRecordLength(t, r, 24)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
-			checkRecordBytes(t, r, 6, []byte{2, 0, byte(StringType), byte(Int32Type)})
+			checkRecordBytes(t, r, 6, []byte{2, 0, StringType, Int32Type})
 			checkRecordBytesOneOf(
 				t, r, 10, [][]byte{
 					{
@@ -777,17 +777,9 @@ func TestRecord_SetMap(t *testing.T) {
 
 			checkRecordLength(t, r, 24)
 			checkRecordBytes(t, r, 4, []byte{6, 0})
+			checkRecordBytes(t, r, 6, []byte{1, 0, StringType, ArrayType})
 			checkRecordBytes(
-				t, r, 6, []byte{
-					1, 0,
-					byte(StringType), byte(ArrayType),
-				},
-			)
-			checkRecordBytes(
-				t, r, 10, []byte{
-					1, 0, 97,
-					2, 0, byte(Int32Type), 1, 0, 0, 0, 2, 0, 0, 0,
-				},
+				t, r, 10, []byte{1, 0, 97, 2, 0, Int32Type, 1, 0, 0, 0, 2, 0, 0, 0},
 			)
 		},
 	)
