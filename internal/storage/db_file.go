@@ -120,29 +120,40 @@ func (dbFile *DatabaseFile) MakeDurable() error {
 	return nil
 }
 
-// AppendPage adds a new page to the end of the file. It returns the page number of the newly added
-// page and pointer to an error, if any.
-func (dbFile *DatabaseFile) AppendPage(page *Page) (uint32, error) {
+// AppendPages adds new pages to the end of the file. It returns an array of page numbers of the
+// newly added pages. An error will be returned on the first failure. In case of failure, the
+// returned array will contain the page numbers of the pages that were successfully added.
+func (dbFile *DatabaseFile) AppendPages(pages *[]Page) ([]uint32, error) {
+	var pageNumbers []uint32
 	if dbFile.NumPages == MaxPagesPerFile {
-		return 0xffff, &FileFullError{}
+		return pageNumbers, &FileFullError{}
 	}
 
 	offset := 6 + dbFile.NumPages*PageSize
-	if _, err := dbFile.file.WriteAt(page[:], int64(offset)); err != nil {
-		return 0xffff, err
+	for i, page := range *pages {
+		if _, err := dbFile.file.WriteAt(page[:], int64(offset)); err != nil {
+			return pageNumbers, err
+		}
+		pageNumbers = append(pageNumbers, dbFile.NumPages+uint32(i))
+		offset += PageSize
 	}
 	dbFile.NumPages++
-	return dbFile.NumPages - 1, nil
+	return pageNumbers, nil
 }
 
-// WritePage writes a page to the given page number in the file. It returns a pointer to an error,
-// if any.
-func (dbFile *DatabaseFile) WritePage(page *Page, pageNum uint32) error {
+// WritePages writes pages starting from the given page number in the file. It returns a number of
+// pages successfully written to the file and a pointer to an error, if any.
+func (dbFile *DatabaseFile) WritePages(pages *[]Page, pageNum uint32) (uint32, error) {
 	offset := 6 + pageNum*PageSize
-	if _, err := dbFile.file.WriteAt(page[:], int64(offset)); err != nil {
-		return err
+	var numWritten uint32
+	for _, page := range *pages {
+		if _, err := dbFile.file.WriteAt(page[:], int64(offset)); err != nil {
+			return numWritten, err
+		}
+		offset += PageSize
+		numWritten++
 	}
-	return nil
+	return numWritten, nil
 }
 
 // ReadPages reads a range of pages from the file. It returns a pointer to an error, if any.

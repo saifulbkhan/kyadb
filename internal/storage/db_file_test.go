@@ -127,7 +127,7 @@ func TestDeleteFile(t *testing.T) {
 	)
 }
 
-func TestDatabaseFile_AppendPage(t *testing.T) {
+func TestDatabaseFile_AppendPages(t *testing.T) {
 	t.Run(
 		"check basic page appending", func(t *testing.T) {
 			dbFile, err := NewFile("test", 1)
@@ -145,9 +145,8 @@ func TestDatabaseFile_AppendPage(t *testing.T) {
 				}
 			}(dbFile.file)
 
-			page := NewTablePage()
-
-			_, err = dbFile.AppendPage(page)
+			pages := []Page{*NewTablePage()}
+			_, err = dbFile.AppendPages(&pages)
 			if err != nil {
 				t.Error(err)
 			}
@@ -181,13 +180,7 @@ func TestDatabaseFile_AppendPage(t *testing.T) {
 				}
 			}(dbFile.file)
 
-			page := NewTablePage()
-			_, err = dbFile.AppendPage(page)
-			if err != nil {
-				t.Error(err)
-			}
-
-			_, err = dbFile.AppendPage(page)
+			_, err = dbFile.AppendPages(&[]Page{*NewTablePage(), *NewTablePage()})
 			if err != nil {
 				t.Error(err)
 			}
@@ -223,14 +216,7 @@ func TestDatabaseFile_WritePage(t *testing.T) {
 				}
 			}(dbFile.file)
 
-			page := NewTablePage()
-			pageNum, err := dbFile.AppendPage(page)
-			if err != nil {
-				t.Error(err)
-			}
-
-			page = NewTablePage()
-			err = dbFile.WritePage(page, pageNum)
+			_, err = dbFile.AppendPages(&[]Page{*NewTablePage()})
 			if err != nil {
 				t.Error(err)
 			}
@@ -266,14 +252,7 @@ func TestDatabaseFile_ReadPages(t *testing.T) {
 				}
 			}(dbFile.file)
 
-			page := NewTablePage()
-			pageNum, err := dbFile.AppendPage(page)
-			if err != nil {
-				t.Error(err)
-			}
-
-			page = NewTablePage()
-			_, err = dbFile.AppendPage(page)
+			_, err = dbFile.AppendPages(&[]Page{*NewTablePage(), *NewTablePage()})
 			if err != nil {
 				t.Error(err)
 			}
@@ -282,7 +261,7 @@ func TestDatabaseFile_ReadPages(t *testing.T) {
 				t.Error(err)
 			}
 
-			pages, err := dbFile.ReadPages(pageNum, 2)
+			pages, err := dbFile.ReadPages(0, 2)
 			if err != nil {
 				t.Error(err)
 			}
@@ -310,14 +289,7 @@ func TestDatabaseFile_ReadPages(t *testing.T) {
 				}
 			}(dbFile.file)
 
-			page := NewTablePage()
-			pageNum, err := dbFile.AppendPage(page)
-			if err != nil {
-				t.Error(err)
-			}
-
-			page = NewTablePage()
-			_, err = dbFile.AppendPage(page)
+			_, err = dbFile.AppendPages(&[]Page{*NewTablePage(), *NewTablePage()})
 			if err != nil {
 				t.Error(err)
 			}
@@ -326,10 +298,48 @@ func TestDatabaseFile_ReadPages(t *testing.T) {
 				t.Error(err)
 			}
 
-			_, err = dbFile.ReadPages(pageNum, 3)
+			_, err = dbFile.ReadPages(0, 3)
 			if err == nil {
 				t.Error("expected error when reading more pages than written")
 			}
 		},
 	)
+}
+
+func BenchmarkDatabaseFile_ReadPages(b *testing.B) {
+	dbFile, err := NewFile("test", 1)
+	if err != nil {
+		b.Error(err)
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			b.Error(err)
+		}
+		err = os.Remove(file.Name())
+		if err != nil {
+			b.Error(err)
+		}
+	}(dbFile.file)
+
+	var pages []Page
+	for i := 0; i < MaxPagesPerFile; i++ {
+		pages = append(pages, *NewTablePage())
+	}
+	_, err = dbFile.AppendPages(&pages)
+	if err != nil {
+		b.Error(err)
+	}
+	err = dbFile.MakeDurable()
+	if err != nil {
+		b.Error(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := dbFile.ReadPages(0, MaxPagesPerFile)
+		if err != nil {
+			b.Error(err)
+		}
+	}
 }
