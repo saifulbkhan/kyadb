@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 /*
@@ -66,7 +67,9 @@ func NewFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	if err := os.MkdirAll(parentDir, 0744); err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(dbFilePath, os.O_CREATE|os.O_EXCL|os.O_RDWR, defaultFilePerm)
+	file, err := os.OpenFile(
+		dbFilePath, os.O_CREATE|os.O_EXCL|os.O_RDWR|syscall.O_DIRECT, defaultFilePerm,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +89,7 @@ func OpenFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(dbFilePath, os.O_RDWR, defaultFilePerm)
+	file, err := os.OpenFile(dbFilePath, os.O_RDWR|syscall.O_DIRECT, defaultFilePerm)
 	if err != nil {
 		return nil, err
 	}
@@ -168,5 +171,3 @@ func (dbFile *DatabaseFile) ReadPages(pageNum uint32, numPages uint32) (*[]Page,
 	}
 	return &pages, nil
 }
-
-// TODO: Method to delete (clear) a page from a file.
