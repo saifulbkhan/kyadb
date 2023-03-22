@@ -9,7 +9,7 @@ import (
 func TestNewFile(t *testing.T) {
 	t.Run(
 		"check basic file creation", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -28,7 +28,7 @@ func TestNewFile(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			want := fmt.Sprintf("%s/.var/lib/kyadb/base/test/1", home)
+			want := fmt.Sprintf("%s/.var/lib/kyadb/db/1", home)
 			got := dbFile.file.Name()
 			if got != want {
 				t.Errorf("got %s, want %s", got, want)
@@ -50,7 +50,7 @@ func TestNewFile(t *testing.T) {
 func TestOpenFile(t *testing.T) {
 	t.Run(
 		"check basic file opening", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -66,7 +66,7 @@ func TestOpenFile(t *testing.T) {
 				t.Error(err)
 			}
 
-			dbFile, err = OpenFile("test", 1)
+			dbFile, err = OpenDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -101,7 +101,7 @@ func TestOpenFile(t *testing.T) {
 func TestDeleteFile(t *testing.T) {
 	t.Run(
 		"check basic file deletion", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -110,7 +110,7 @@ func TestDeleteFile(t *testing.T) {
 				t.Error(err)
 			}
 
-			err = DeleteFile("test", 1)
+			err = DeleteDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -130,7 +130,7 @@ func TestDeleteFile(t *testing.T) {
 func TestDatabaseFile_AppendPages(t *testing.T) {
 	t.Run(
 		"check basic page appending", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -165,7 +165,7 @@ func TestDatabaseFile_AppendPages(t *testing.T) {
 
 	t.Run(
 		"check page appending with offset", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -201,7 +201,7 @@ func TestDatabaseFile_AppendPages(t *testing.T) {
 func TestDatabaseFile_WritePage(t *testing.T) {
 	t.Run(
 		"check basic page writing", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -237,7 +237,7 @@ func TestDatabaseFile_WritePage(t *testing.T) {
 func TestDatabaseFile_ReadPages(t *testing.T) {
 	t.Run(
 		"check basic page reading", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -274,7 +274,7 @@ func TestDatabaseFile_ReadPages(t *testing.T) {
 
 	t.Run(
 		"check page reading beyond file size", func(t *testing.T) {
-			dbFile, err := NewFile("test", 1)
+			dbFile, err := NewDatabaseFile(1)
 			if err != nil {
 				t.Error(err)
 			}
@@ -307,7 +307,7 @@ func TestDatabaseFile_ReadPages(t *testing.T) {
 }
 
 func BenchmarkDatabaseFile_ReadPages(b *testing.B) {
-	dbFile, err := NewFile("test", 1)
+	dbFile, err := NewDatabaseFile(1)
 	if err != nil {
 		b.Error(err)
 	}

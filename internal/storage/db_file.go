@@ -17,8 +17,9 @@ import (
  */
 
 const (
-	VarDir          = ".var"           // TODO: make this configurable
-	BaseStoragePath = "lib/kyadb/base" // TODO: make this configurable
+	VarDir          = ".var"      // TODO: make this configurable
+	BaseDataPath    = "lib/kyadb" // TODO: make this configurable
+	DBDataDir       = "db"        // TODO: make this configurable
 	MaxPagesPerFile = 256 * 1024
 	defaultFilePerm = 0644
 )
@@ -37,13 +38,13 @@ func (e *FileFullError) Error() string {
 
 // dbFilePath returns the path to the database file on disk. It may return an error if the directory
 // path cannot be determined.
-func dbFilePath(tableName string, fileID uint16) (string, error) {
+func dbFilePath(fileID uint16) (string, error) {
 	// TODO: data should not be in user's home directory, fine for MVP
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	dbFilePath := fmt.Sprintf("%s/%s/%s/%s/%d", home, VarDir, BaseStoragePath, tableName, fileID)
+	dbFilePath := fmt.Sprintf("%s/%s/%s/%s/%d", home, VarDir, BaseDataPath, DBDataDir, fileID)
 	return dbFilePath, nil
 }
 
@@ -57,9 +58,9 @@ func (dbFile *DatabaseFile) loadNumPages() error {
 	return nil
 }
 
-// NewFile creates a new database file on disk, with the given table name and file ID.
-func NewFile(tableName string, fileID uint16) (*DatabaseFile, error) {
-	dbFilePath, err := dbFilePath(tableName, fileID)
+// NewDatabaseFile creates a new database file on disk, with the given table name and file ID.
+func NewDatabaseFile(fileID uint16) (*DatabaseFile, error) {
+	dbFilePath, err := dbFilePath(fileID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,9 +84,9 @@ func NewFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	return dbFile, nil
 }
 
-// OpenFile opens an existing database file on disk, with the given table name and file ID.
-func OpenFile(tableName string, fileID uint16) (*DatabaseFile, error) {
-	dbFilePath, err := dbFilePath(tableName, fileID)
+// OpenDatabaseFile opens an existing database file on disk, with the given table name and file ID.
+func OpenDatabaseFile(fileID uint16) (*DatabaseFile, error) {
+	dbFilePath, err := dbFilePath(fileID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,9 +101,9 @@ func OpenFile(tableName string, fileID uint16) (*DatabaseFile, error) {
 	return dbFile, err
 }
 
-// DeleteFile deletes the database file on disk, with the given table name and file ID.
-func DeleteFile(tableName string, fileID uint16) error {
-	dbFilePath, err := dbFilePath(tableName, fileID)
+// DeleteDatabaseFile deletes the database file on disk, with the given table name and file ID.
+func DeleteDatabaseFile(fileID uint16) error {
+	dbFilePath, err := dbFilePath(fileID)
 	if err != nil {
 		return err
 	}
