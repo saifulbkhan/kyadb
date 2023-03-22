@@ -1,4 +1,4 @@
-package storage
+package element
 
 import (
 	"encoding/binary"
@@ -8,39 +8,39 @@ import (
 )
 
 const (
-	NullType    ElementType = '\x00'
-	Uint32Type  ElementType = 'u'
-	Uint64Type  ElementType = 'v'
-	Int32Type   ElementType = 'i'
-	Int64Type   ElementType = 'l'
-	Float32Type ElementType = 'f'
-	Float64Type ElementType = 'd'
-	BoolType    ElementType = 'b'
-	StringType  ElementType = 's'
-	TimeType    ElementType = 't'
-	ArrayType   ElementType = 'a'
-	MapType     ElementType = 'm'
+	NullType    Type = '\x00'
+	Uint32Type  Type = 'u'
+	Uint64Type  Type = 'v'
+	Int32Type   Type = 'i'
+	Int64Type   Type = 'l'
+	Float32Type Type = 'f'
+	Float64Type Type = 'd'
+	BoolType    Type = 'b'
+	StringType  Type = 's'
+	TimeType    Type = 't'
+	ArrayType   Type = 'a'
+	MapType     Type = 'm'
 )
 
 type Bytes = []byte
-type ElementType = byte
+type Type = byte
 
 type Array struct {
-	ElementType ElementType
+	ElementType Type
 	Values      []any
 }
 
 type Map struct {
-	KeyType   ElementType
-	ValueType ElementType
+	KeyType   Type
+	ValueType Type
 	Data      map[any]any
 }
 
 // TypeMismatchError is returned when the type of the user-provided value does not match the type
 // of the element expected at a position.
 type TypeMismatchError struct {
-	expected ElementType
-	actual   ElementType
+	Expected Type
+	Actual   Type
 }
 
 // UnrecognizedTypeError is returned when the type of the user-provided value is not recognized.
@@ -49,11 +49,11 @@ type UnrecognizedTypeError struct {
 }
 
 func (e *TypeMismatchError) Error() string {
-	expectedTypeName, err := NameForElementType(e.expected)
+	expectedTypeName, err := NameForType(e.Expected)
 	if err != nil {
 		return err.Error()
 	}
-	actualTypeName, err := NameForElementType(e.actual)
+	actualTypeName, err := NameForType(e.Actual)
 	if err != nil {
 		return err.Error()
 	}
@@ -64,7 +64,7 @@ func (e *UnrecognizedTypeError) Error() string {
 	return fmt.Sprintf("unrecognized type %T", e.value)
 }
 
-func NameForElementType(elemType ElementType) (string, error) {
+func NameForType(elemType Type) (string, error) {
 	var elemTypeName string
 	var err error
 	switch elemType {
@@ -98,8 +98,8 @@ func NameForElementType(elemType ElementType) (string, error) {
 	return elemTypeName, err
 }
 
-func ElementTypeForValue(value any) (ElementType, error) {
-	var elemType ElementType
+func TypeForValue(value any) (Type, error) {
+	var elemType Type
 	var err error
 	switch value.(type) {
 	case bool:
@@ -130,7 +130,7 @@ func ElementTypeForValue(value any) (ElementType, error) {
 	return elemType, err
 }
 
-func IsPrimitiveElementType(elemType ElementType) bool {
+func IsPrimitiveType(elemType Type) bool {
 	return elemType != NullType && elemType != ArrayType && elemType != MapType
 }
 
@@ -229,8 +229,8 @@ func WriteString(b *Bytes, offset uint16, value string) {
 	copy((*b)[offset+2:offset+2+strLen], value)
 }
 
-func WritePrimitive(b *Bytes, offset uint16, value any, expectedType ElementType) (uint16, error) {
-	checkElementType := func(actualType ElementType) error {
+func WritePrimitive(b *Bytes, offset uint16, value any, expectedType Type) (uint16, error) {
+	checkElementType := func(actualType Type) error {
 		if expectedType != actualType {
 			return &TypeMismatchError{expectedType, actualType}
 		}
@@ -390,7 +390,7 @@ func ReadString(b *Bytes, offset uint16) (string, uint16) {
 	return string((*b)[offset+2 : offset+2+strLen]), strLen
 }
 
-func ReadPrimitive(b *Bytes, offset uint16, expectedType ElementType) (any, uint16, error) {
+func ReadPrimitive(b *Bytes, offset uint16, expectedType Type) (any, uint16, error) {
 	var value any
 	var offsetAfterRead uint16
 	var err error

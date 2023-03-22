@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"syscall"
+
+	"kyadb/internal/structs/element"
 )
 
 /*
@@ -54,7 +56,7 @@ func (dbFile *DatabaseFile) loadNumPages() error {
 	if _, err := dbFile.file.ReadAt(b, 2); err != nil {
 		return err
 	}
-	dbFile.NumPages = ReadUint32(&b, 0)
+	dbFile.NumPages = element.ReadUint32(&b, 0)
 	return nil
 }
 
@@ -113,8 +115,8 @@ func DeleteDatabaseFile(fileID uint16) error {
 // MakeDurable commits the current contents of the file to stable storage.
 func (dbFile *DatabaseFile) MakeDurable() error {
 	var header = make([]byte, 6)
-	WriteUint16(&header, 0, dbFile.FileId)
-	WriteUint32(&header, 2, dbFile.NumPages)
+	element.WriteUint16(&header, 0, dbFile.FileId)
+	element.WriteUint32(&header, 2, dbFile.NumPages)
 	if _, err := dbFile.file.WriteAt(header, 0); err != nil {
 		return err
 	}

@@ -3,6 +3,8 @@ package storage
 import (
 	"reflect"
 	"testing"
+
+	"kyadb/internal/structs/element"
 )
 
 func TestTablePage_AddRecord(t *testing.T) {
@@ -13,14 +15,22 @@ func TestTablePage_AddRecord(t *testing.T) {
 			if err != nil {
 				return
 			}
-			err = r1.SetMap(1, Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}})
+			err = r1.SetMap(
+				1, element.Map{
+					element.StringType,
+					element.Int32Type, map[any]any{"a": 1, "b": 2},
+				},
+			)
 			if err != nil {
 				t.Error(err)
 			}
 
 			r2 := NewRecord(2)
 			r2.SetInt32(0, 123)
-			err = r2.SetArray(1, Array{StringType, []any{"foo", "bar", "hello", "world"}})
+			err = r2.SetArray(
+				1,
+				element.Array{element.StringType, []any{"foo", "bar", "hello", "world"}},
+			)
 			if err != nil {
 				t.Error(err)
 			}
@@ -99,14 +109,22 @@ func TestTablePage_GetRecord(t *testing.T) {
 			if err != nil {
 				return
 			}
-			err = r1.SetMap(1, Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}})
+			err = r1.SetMap(
+				1, element.Map{
+					element.StringType,
+					element.Int32Type, map[any]any{"a": 1, "b": 2},
+				},
+			)
 			if err != nil {
 				t.Error(err)
 			}
 
 			r2 := NewRecord(2)
 			r2.SetInt32(0, 123)
-			err = r2.SetArray(1, Array{StringType, []any{"foo", "bar", "hello", "world"}})
+			err = r2.SetArray(
+				1,
+				element.Array{element.StringType, []any{"foo", "bar", "hello", "world"}},
+			)
 			if err != nil {
 				t.Error(err)
 			}
@@ -199,13 +217,13 @@ func TestTablePage_UpdateRecord(t *testing.T) {
 			}
 
 			r3 := NewRecord(2)
-			err = r3.SetArray(0, Array{Int32Type, []any{1, 2, 3}})
+			err = r3.SetArray(0, element.Array{element.Int32Type, []any{1, 2, 3}})
 			if err != nil {
 				t.Error(err)
 			}
 			err = r3.SetMap(
 				1,
-				Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}},
+				element.Map{element.StringType, element.Int32Type, map[any]any{"a": 1, "b": 2}},
 			)
 			if err != nil {
 				t.Error(err)
@@ -254,13 +272,13 @@ func TestTablePage_UpdateRecord(t *testing.T) {
 				t.Errorf("expected r2 %v, got %v", r2, got)
 			}
 
-			err = r3.SetArray(0, Array{Int32Type, []any{4, 5, 6}})
+			err = r3.SetArray(0, element.Array{element.Int32Type, []any{4, 5, 6}})
 			if err != nil {
 				t.Error(err)
 			}
 			err = r3.SetMap(
 				1,
-				Map{StringType, Int32Type, map[any]any{"c": 3, "d": 4}},
+				element.Map{element.StringType, element.Int32Type, map[any]any{"c": 3, "d": 4}},
 			)
 			if err != nil {
 				t.Error(err)
@@ -296,13 +314,13 @@ func TestTablePage_UpdateRecord(t *testing.T) {
 			}
 
 			r3 := NewRecord(2)
-			err = r3.SetArray(0, Array{Int32Type, []any{1, 2, 3}})
+			err = r3.SetArray(0, element.Array{element.Int32Type, []any{1, 2, 3}})
 			if err != nil {
 				t.Error(err)
 			}
 			err = r3.SetMap(
 				1,
-				Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}},
+				element.Map{element.StringType, element.Int32Type, map[any]any{"a": 1, "b": 2}},
 			)
 			if err != nil {
 				t.Error(err)
@@ -418,13 +436,13 @@ func TestTablePage_DeleteRecord(t *testing.T) {
 			}
 
 			r3 := NewRecord(2)
-			err = r3.SetArray(0, Array{Int32Type, []any{1, 2, 3}})
+			err = r3.SetArray(0, element.Array{element.Int32Type, []any{1, 2, 3}})
 			if err != nil {
 				t.Error(err)
 			}
 			err = r3.SetMap(
 				1,
-				Map{StringType, Int32Type, map[any]any{"a": 1, "b": 2}},
+				element.Map{element.StringType, element.Int32Type, map[any]any{"a": 1, "b": 2}},
 			)
 			if err != nil {
 				t.Error(err)

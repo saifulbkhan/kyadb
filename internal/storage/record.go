@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"math"
 	"time"
+
+	"kyadb/internal/structs/element"
 )
 
-type Record Bytes
+type Record element.Bytes
 type ElementPosition = uint16
 
 // WriteOverflowError is returned when there is not enough space in the record to write the given
@@ -21,17 +23,17 @@ type WriteOverflowError struct {
 // InvalidElementTypeError is returned when user tries to create an Array with an unsupported
 // element type.
 type InvalidElementTypeError struct {
-	elemType ElementType
+	elemType element.Type
 }
 
 // InvalidKeyTypeError is returned when user tries to create a Map with an unsupported key type.
 type InvalidKeyTypeError struct {
-	keyType ElementType
+	keyType element.Type
 }
 
 // InvalidValueTypeError is returned when user tries to create a Map with an unsupported value type.
 type InvalidValueTypeError struct {
-	valueType ElementType
+	valueType element.Type
 }
 
 func (e *WriteOverflowError) Error() string {
@@ -39,7 +41,7 @@ func (e *WriteOverflowError) Error() string {
 }
 
 func (e *InvalidElementTypeError) Error() string {
-	elemTypeName, err := NameForElementType(e.elemType)
+	elemTypeName, err := element.NameForType(e.elemType)
 	if err != nil {
 		return err.Error()
 	}
@@ -47,7 +49,7 @@ func (e *InvalidElementTypeError) Error() string {
 }
 
 func (e *InvalidKeyTypeError) Error() string {
-	keyTypeName, err := NameForElementType(e.keyType)
+	keyTypeName, err := element.NameForType(e.keyType)
 	if err != nil {
 		return err.Error()
 	}
@@ -55,7 +57,7 @@ func (e *InvalidKeyTypeError) Error() string {
 }
 
 func (e *InvalidValueTypeError) Error() string {
-	valueTypeName, err := NameForElementType(e.valueType)
+	valueTypeName, err := element.NameForType(e.valueType)
 	if err != nil {
 		return err.Error()
 	}
@@ -105,7 +107,7 @@ func (r *Record) SetUint32(position ElementPosition, value uint32) {
 		r.setOffset(position, offset)
 		*r = append(*r, make([]byte, 4)...)
 	}
-	WriteUint32((*Bytes)(r), offset, value)
+	element.WriteUint32((*element.Bytes)(r), offset, value)
 }
 
 // SetUint64 saves the given uint64 value at the given element position in the record.
@@ -117,7 +119,7 @@ func (r *Record) SetUint64(position ElementPosition, value uint64) {
 		r.setOffset(position, offset)
 		*r = append(*r, make([]byte, 8)...)
 	}
-	WriteUint64((*Bytes)(r), offset, value)
+	element.WriteUint64((*element.Bytes)(r), offset, value)
 }
 
 // SetInt32 saves the given int32 value at the given element position in the record.
@@ -149,7 +151,7 @@ func (r *Record) SetBool(position ElementPosition, value bool) {
 		r.setOffset(position, offset)
 		*r = append(*r, byte(0))
 	}
-	WriteBool((*Bytes)(r), offset, value)
+	element.WriteBool((*element.Bytes)(r), offset, value)
 }
 
 // SetTime saves the given time value at the given element position in the record.
@@ -167,9 +169,9 @@ func (r *Record) SetString(position ElementPosition, value string) error {
 	offset := r.offsetForPosition(position)
 	if offset == 0 {
 		offset = r.Length()
-		numBytes := BytesNeededForString(value)
+		numBytes := element.BytesNeededForString(value)
 		*r = append(*r, make([]byte, numBytes)...)
-		WriteString((*Bytes)(r), offset, value)
+		element.WriteString((*element.Bytes)(r), offset, value)
 		r.setOffset(position, offset)
 		r.setLength(offset + numBytes)
 	} else {
@@ -180,7 +182,7 @@ func (r *Record) SetString(position ElementPosition, value string) error {
 				currentLength, requiredLength, value,
 			}
 		}
-		WriteString((*Bytes)(r), offset, value)
+		element.WriteString((*element.Bytes)(r), offset, value)
 	}
 	return nil
 }
@@ -195,11 +197,11 @@ func (r *Record) SetString(position ElementPosition, value string) error {
 //
 // If the type of incoming Array element type does not match the existing Array element type,
 // a TypeMismatchError is returned.
-func (r *Record) SetArray(position ElementPosition, a Array) error {
-	if a.ElementType == ArrayType {
+func (r *Record) SetArray(position ElementPosition, a element.Array) error {
+	if a.ElementType == element.ArrayType {
 		return &InvalidElementTypeError{a.ElementType}
 	}
-	if a.ElementType == MapType {
+	if a.ElementType == element.MapType {
 		return &InvalidElementTypeError{a.ElementType}
 	}
 	if a.Values == nil {
@@ -209,12 +211,12 @@ func (r *Record) SetArray(position ElementPosition, a Array) error {
 	offset := r.offsetForPosition(position)
 	if offset == 0 {
 		offset = r.Length()
-		numBytes, err := BytesNeededForArray(a)
+		numBytes, err := element.BytesNeededForArray(a)
 		if err != nil {
 			return err
 		}
 		*r = append(*r, make([]byte, numBytes)...)
-		_, err = WriteArray((*Bytes)(r), offset, a)
+		_, err = element.WriteArray((*element.Bytes)(r), offset, a)
 		if err != nil {
 			return err
 		}
@@ -223,7 +225,7 @@ func (r *Record) SetArray(position ElementPosition, a Array) error {
 	} else {
 		currentElementType := (*r)[offset+2]
 		if currentElementType != a.ElementType {
-			return &TypeMismatchError{currentElementType, a.ElementType}
+			return &element.TypeMismatchError{Expected: currentElementType, Actual: a.ElementType}
 		}
 		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
 		requiredLength := uint16(len(a.Values))
@@ -232,7 +234,7 @@ func (r *Record) SetArray(position ElementPosition, a Array) error {
 				currentLength, requiredLength, a,
 			}
 		}
-		_, err := WriteArray((*Bytes)(r), offset, a)
+		_, err := element.WriteArray((*element.Bytes)(r), offset, a)
 		if err != nil {
 			return err
 		}
@@ -251,14 +253,14 @@ func (r *Record) SetArray(position ElementPosition, a Array) error {
 //
 // If the type of incoming Map key and value types do not match the existing Map key and value
 // types, a TypeMismatchError is returned.
-func (r *Record) SetMap(position ElementPosition, m Map) error {
-	if m.KeyType == ArrayType {
+func (r *Record) SetMap(position ElementPosition, m element.Map) error {
+	if m.KeyType == element.ArrayType {
 		return &InvalidKeyTypeError{m.KeyType}
 	}
-	if m.KeyType == MapType {
+	if m.KeyType == element.MapType {
 		return &InvalidKeyTypeError{m.KeyType}
 	}
-	if m.ValueType == MapType {
+	if m.ValueType == element.MapType {
 		return &InvalidValueTypeError{m.ValueType}
 	}
 	if m.Data == nil {
@@ -268,12 +270,12 @@ func (r *Record) SetMap(position ElementPosition, m Map) error {
 	offset := r.offsetForPosition(position)
 	if offset == 0 {
 		offset = r.Length()
-		numBytes, err := BytesNeededForMap(m)
+		numBytes, err := element.BytesNeededForMap(m)
 		if err != nil {
 			return err
 		}
 		*r = append(*r, make([]byte, numBytes)...)
-		_, err = WriteMap((*Bytes)(r), offset, m)
+		_, err = element.WriteMap((*element.Bytes)(r), offset, m)
 		if err != nil {
 			return err
 		}
@@ -282,12 +284,12 @@ func (r *Record) SetMap(position ElementPosition, m Map) error {
 	} else {
 		currentKeyType := (*r)[offset+2]
 		if currentKeyType != m.KeyType {
-			err := &TypeMismatchError{currentKeyType, m.KeyType}
+			err := &element.TypeMismatchError{Expected: currentKeyType, Actual: m.KeyType}
 			return fmt.Errorf("key type mismatch: %w", err)
 		}
 		currentValueType := (*r)[offset+3]
 		if currentValueType != m.ValueType {
-			err := &TypeMismatchError{currentValueType, m.ValueType}
+			err := &element.TypeMismatchError{Expected: currentValueType, Actual: m.ValueType}
 			return fmt.Errorf("value type mismatch: %w", err)
 		}
 		currentLength := binary.LittleEndian.Uint16((*r)[offset : offset+2])
@@ -297,7 +299,7 @@ func (r *Record) SetMap(position ElementPosition, m Map) error {
 				currentLength, requiredLength, m,
 			}
 		}
-		_, err := WriteMap((*Bytes)(r), offset, m)
+		_, err := element.WriteMap((*element.Bytes)(r), offset, m)
 		if err != nil {
 			return err
 		}
@@ -390,27 +392,27 @@ func (r *Record) GetString(position ElementPosition) (isNull bool, value string)
 	offset := r.offsetForPosition(position)
 	isNull = offset == 0
 	if !isNull {
-		value, _ = ReadString((*Bytes)(r), offset)
+		value, _ = element.ReadString((*element.Bytes)(r), offset)
 	}
 	return isNull, value
 }
 
 // GetArray returns the Array value stored at the given element position in the record.
-func (r *Record) GetArray(position ElementPosition) (isNull bool, value Array, err error) {
+func (r *Record) GetArray(position ElementPosition) (isNull bool, value element.Array, err error) {
 	offset := r.offsetForPosition(position)
 	isNull = offset == 0
 	if !isNull {
-		value, _, err = ReadArray((*Bytes)(r), offset)
+		value, _, err = element.ReadArray((*element.Bytes)(r), offset)
 	}
 	return isNull, value, err
 }
 
 // GetMap returns the Map value stored at the given element position in the record.
-func (r *Record) GetMap(position ElementPosition) (isNull bool, value Map, err error) {
+func (r *Record) GetMap(position ElementPosition) (isNull bool, value element.Map, err error) {
 	offset := r.offsetForPosition(position)
 	isNull = offset == 0
 	if !isNull {
-		value, _, err = ReadMap((*Bytes)(r), offset)
+		value, _, err = element.ReadMap((*element.Bytes)(r), offset)
 	}
 	return isNull, value, err
 }
