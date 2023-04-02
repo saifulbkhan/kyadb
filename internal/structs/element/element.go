@@ -20,6 +20,7 @@ const (
 	TimeType    Type = 't'
 	ArrayType   Type = 'a'
 	MapType     Type = 'm'
+	AnyType     Type = 'x'
 )
 
 type Bytes = []byte
@@ -231,10 +232,10 @@ func WriteString(b *Bytes, offset uint16, value string) {
 
 func WritePrimitive(b *Bytes, offset uint16, value any, expectedType Type) (uint16, error) {
 	checkElementType := func(actualType Type) error {
-		if expectedType != actualType {
-			return &TypeMismatchError{expectedType, actualType}
+		if expectedType == AnyType || expectedType == actualType {
+			return nil
 		}
-		return nil
+		return &TypeMismatchError{expectedType, actualType}
 	}
 
 	var offsetAfterWrite uint16
